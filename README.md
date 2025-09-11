@@ -18,7 +18,7 @@ GitHub Insights provides powerful and real-time analytics for your GitHub reposi
 
 ---
 
-## 🚀 Getting Started
+##  Getting Started
 
 ### Prerequisites
 - Node.js (v16 or later recommended)  
@@ -36,7 +36,7 @@ cd GitHub-Insights-Smarter-Analytics-for-Git-Repositories
 
 ---
 
-### ⚙ Install Dependencies
+###  Install Dependencies
 
 ```bash
 npm install
@@ -54,7 +54,7 @@ Create a `.env.local` file in the root directory with the following content:
 GITHUB_TOKEN=your_github_personal_access_token_here
 ```
 
-> 🔑 Replace `your_github_personal_access_token_here` with your actual GitHub token.  
+>  Replace `your_github_personal_access_token_here` with your actual GitHub token.  
 > This is required to authenticate with the GitHub API and access extended rate limits or private repositories.
 
 ---
@@ -81,7 +81,7 @@ GitHub-Insights-Smarter-Analytics-for-Git-Repositories/
 
 ---
 
-## 🤝 Contributing
+##  Contributing
 
 Contributions are always welcome! Whether it's improving the UI, fixing bugs, or adding new features:
 
@@ -95,13 +95,13 @@ Please make sure to follow the existing code style and include tests where appli
 
 ---
 
-## 📜 License
+##  License
 
 This project is open-source and available under the MIT License.
 
 ---
 
-## 📬 Contact
+##  Contact
 
 For questions, feature requests, or feedback, feel free to open an issue or reach out on GitHub.
 

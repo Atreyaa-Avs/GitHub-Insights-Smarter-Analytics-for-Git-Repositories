@@ -14,19 +14,17 @@ import ScrollPin from "@/components/ScrollPin";
 import ZigZagLayout from "@/components/ZigZagLayout";
 import KeyCapabilities from "@/components/KeyCapabilities";
 import Integrations from "@/components/Integrations";
+import MainLoader from "@/components/MainLoader";
 
 const page = () => {
   const [deleteLoading, setDeleteLoading] = useState(false);
 
-  useEffect(() => {
-    window.scrollTo(0, 0);
-  }, []);
 
   return (
     <div className="bg-neutral-100 dark:bg-black">
-      {/* <div className={`absolute inset-0 ${deleteLoading && "hidden"}`}>
+      <div className={`absolute inset-0 ${deleteLoading && "hidden"}`}>
         <MainLoader setDeleteLoading={setDeleteLoading} />
-      </div> */}
+      </div>
       <NavBar />
       <div
         className="bg-cover bg-center bg-no-repeat bg-[url('/Backgrounds/Main_Bg.jpg')] 

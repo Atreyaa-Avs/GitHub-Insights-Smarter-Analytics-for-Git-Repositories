@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect } from "react";
 import { NumberTicker } from "./magicui/number-ticker";
 import { Ripple } from "./magicui/ripple";
 import { motion } from "motion/react";
@@ -10,16 +10,37 @@ interface MainLoaderProps {
 }
 
 const MainLoader = ({ setDeleteLoading }: MainLoaderProps) => {
-  const [hideNow, setHideNow] = useState(false);
-  const [hidden, setHidden] = useState(false);
+  // Synchronously check sessionStorage before component renders
+  const shouldShowLoader = (() => {
+    if (typeof window !== "undefined") {
+      return !sessionStorage.getItem("loaderShown");
+    }
+    return true;
+  })();
 
-  // Lock scroll while loader is visible
+  // If loader shouldn't show, we start as hidden to avoid rendering it at all
+  const [hideNow, setHideNow] = useState(false);
+  const [hidden, setHidden] = useState(!shouldShowLoader);
+
+  useEffect(() => {
+    if (!shouldShowLoader) {
+      setDeleteLoading(true);
+    }
+  }, [shouldShowLoader, setDeleteLoading]);
+
   useEffect(() => {
     document.body.style.overflow = hidden ? "auto" : "hidden";
   }, [hidden]);
 
-  // Unmount loader after animation completes
   if (hidden) return null;
+
+  const handleAnimationComplete = () => {
+    if (hideNow) {
+      setHidden(true);
+      setDeleteLoading(true);
+      sessionStorage.setItem("loaderShown", "true");
+    }
+  };
 
   return (
     <motion.div
@@ -27,12 +48,7 @@ const MainLoader = ({ setDeleteLoading }: MainLoaderProps) => {
       initial={{ y: 0 }}
       animate={{ y: hideNow ? "-100%" : 0 }}
       transition={{ duration: 0.8, ease: "easeInOut", delay: 0.5 }}
-      onAnimationComplete={() => {
-        if (hideNow) {
-          setHidden(true);
-          setDeleteLoading(true);
-        }
-      }}
+      onAnimationComplete={handleAnimationComplete}
     >
       <div className="flex items-center justify-center min-h-dvh">
         <p className="z-10 text-center text-2xl xl:text-4xl font-medium tracking-tight text-gray-700">

@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
@@ -45,7 +46,13 @@ const Page = () => {
           Go Back
         </Button>
 
-        <h1 className="font-bold text-2xl">{data ? data.name : "Repo"}</h1>
+        <h1 className="font-bold text-2xl">
+          {isLoading ? (
+            <Skeleton className="h-8 w-48" />
+          ) : (
+            data?.name
+          )}
+        </h1>
 
         <div className="mt-1 md:mt-2 scale-75 md:scale-100">
           <AnimatedThemeToggler />
@@ -53,38 +60,42 @@ const Page = () => {
       </div>
 
       {/* Content */}
-      <div className="flex-1 flex-col p-3 bg-neutral-200 dark:bg-neutral-700 flex-grow overflow-auto">
-        <h1 className="text-3xl text-center font-semibold">{decodedRepo}</h1>
-
-        {isLoading && <p className="text-center mt-4">Loading...</p>}
-        {error && (
-          <p className="text-center mt-4 text-red-500">
-            Error loading repo data
-          </p>
-        )}
-        {data && (
-          <div className="flex flex-col gap-2 mx-auto max-w-2xl space-y-4 mt-6 bg-white p-6 rounded-2xl shadow-acternity dark:bg-black">
-            <h2 className="text-lg">
-              <span className="text-xl font-bold">Name:</span> {data.name}
-            </h2>
-            <p className="text-lg">
-              <span className="text-xl font-bold">Description:</span>{" "}
-              {data.description}
-            </p>
-            <p className="text-lg">
-              <span className="text-xl font-bold">Stars:</span>{" "}
-              {data.stargazers_count}
-            </p>
-            <p className="text-lg">
-              <span className="text-xl font-bold">Forks:</span>{" "}
-              {data.forks_count}
-            </p>
-            <p className="text-lg">
-              <span className="text-xl font-bold">Language:</span>{" "}
-              {data.language}
-            </p>
-          </div>
-        )}
+      <div className="flex-1 p-3 bg-neutral-200 dark:bg-neutral-700 flex-grow overflow-auto flex justify-center items-center">
+        <div className="bg-white dark:bg-black p-6 rounded-2xl shadow-acternity w-full max-w-2xl min-h-[300px] flex flex-col justify-center items-start gap-4">
+          {isLoading ? (
+            <>
+              <Skeleton className="h-6 w-3/4" />
+              <Skeleton className="h-6 w-full" />
+              <Skeleton className="h-6 w-1/2" />
+              <Skeleton className="h-6 w-2/3" />
+              <Skeleton className="h-6 w-1/3" />
+            </>
+          ) : error ? (
+            <p className="text-center text-red-500">Error loading repo data</p>
+          ) : (
+            <div className="flex flex-col gap-4 w-full">
+              <h2 className="text-lg">
+                <span className="text-xl font-bold">Name:</span> {data.name}
+              </h2>
+              <p className="text-lg">
+                <span className="text-xl font-bold">Description:</span>{" "}
+                {data.description}
+              </p>
+              <p className="text-lg">
+                <span className="text-xl font-bold">Stars:</span>{" "}
+                {data.stargazers_count}
+              </p>
+              <p className="text-lg">
+                <span className="text-xl font-bold">Forks:</span>{" "}
+                {data.forks_count}
+              </p>
+              <p className="text-lg">
+                <span className="text-xl font-bold">Language:</span>{" "}
+                {data.language}
+              </p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -18,12 +18,23 @@ export async function GET(request: Request) {
   }
 
   try {
-    const response = await fetch(`https://api.github.com/repos/${repoUrl}/stats/participation`, {
-      headers: {
-        Accept: "application/vnd.github+json",
-        Authorization: `Bearer ${githubAccessToken}`,
-      },
-    });
+    const response = await fetch(
+      `https://api.github.com/repos/${repoUrl}/stats/participation`,
+      {
+        headers: {
+          Accept: "application/vnd.github+json",
+          Authorization: `Bearer ${githubAccessToken}`,
+        },
+      }
+    );
+
+    if (response.status === 202) {
+      // Data is being generated, ask client to retry later
+      return NextResponse.json(
+        { message: "Participation stats are being generated, try again shortly." },
+        { status: 202 }
+      );
+    }
 
     if (!response.ok) {
       return NextResponse.json(

@@ -18,23 +18,39 @@ export async function GET(request: Request) {
   }
 
   try {
-    const response = await fetch(`https://api.github.com/repos/${repoUrl}/releases`, {
-      headers: {
-        Accept: "application/vnd.github+json",
-        Authorization: `Bearer ${githubAccessToken}`,
-      },
-    });
+    // 1. Get total release count using pagination
+    const countRes = await fetch(
+      `https://api.github.com/repos/${repoUrl}/releases?per_page=1`,
+      {
+        headers: {
+          Accept: "application/vnd.github+json",
+          Authorization: `Bearer ${githubAccessToken}`,
+        },
+      }
+    );
 
-    if (!response.ok) {
-      return NextResponse.json(
-        { error: "GitHub API error" },
-        { status: response.status }
-      );
+    let totalCount = 1; // fallback to 1 if only one release
+    const linkHeader = countRes.headers.get("link");
+    if (linkHeader) {
+      const lastPageMatch = linkHeader.match(/&page=(\d+)>;\s*rel="last"/);
+      if (lastPageMatch) {
+        totalCount = Number(lastPageMatch[1]);
+      }
     }
 
-    const data = await response.json();
+    // 2. Get the 5 latest releases
+    const releasesRes = await fetch(
+      `https://api.github.com/repos/${repoUrl}/releases?per_page=5`,
+      {
+        headers: {
+          Accept: "application/vnd.github+json",
+          Authorization: `Bearer ${githubAccessToken}`,
+        },
+      }
+    );
+    const releases = await releasesRes.json();
 
-    return NextResponse.json(data);
+    return NextResponse.json({ totalCount, releases });
   } catch (error) {
     console.error("Fetch error:", error);
     return NextResponse.json(

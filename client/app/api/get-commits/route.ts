@@ -18,23 +18,55 @@ export async function GET(request: Request) {
   }
 
   try {
-    const response = await fetch(`https://api.github.com/repos/${repoUrl}/commits`, {
-      headers: {
-        Accept: "application/vnd.github+json",
-        Authorization: `Bearer ${githubAccessToken}`,
-      },
-    });
+    // Fetch per_page=1 to get total commits via Link header
+    const countResponse = await fetch(
+      `https://api.github.com/repos/${repoUrl}/commits?per_page=1`,
+      {
+        headers: {
+          Accept: "application/vnd.github+json",
+          Authorization: `Bearer ${githubAccessToken}`,
+        },
+      }
+    );
 
-    if (!response.ok) {
+    if (!countResponse.ok) {
       return NextResponse.json(
-        { error: "GitHub API error" },
-        { status: response.status }
+        { error: "GitHub API error fetching commit count" },
+        { status: countResponse.status }
       );
     }
 
-    const data = await response.json();
+    let totalCommits = 1; // default fallback
+    const linkHeader = countResponse.headers.get("link");
+    if (linkHeader) {
+      const match = linkHeader.match(/&page=(\d+)>;\s*rel="last"/);
+      if (match) {
+        totalCommits = Number(match[1]);
+      }
+    }
 
-    return NextResponse.json(data);
+    // Fetch top 5 recent commits
+    const recentResponse = await fetch(
+      `https://api.github.com/repos/${repoUrl}/commits?per_page=5`,
+      {
+        headers: {
+          Accept: "application/vnd.github+json",
+          Authorization: `Bearer ${githubAccessToken}`,
+        },
+      }
+    );
+
+    if (!recentResponse.ok) {
+      return NextResponse.json(
+        { error: "GitHub API error fetching recent commits" },
+        { status: recentResponse.status }
+      );
+    }
+
+    const recentCommits = await recentResponse.json();
+
+    // Return total commits and recent commits
+    return NextResponse.json({ totalCommits, recentCommits });
   } catch (error) {
     console.error("Fetch error:", error);
     return NextResponse.json(

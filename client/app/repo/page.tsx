@@ -2,8 +2,25 @@
 
 import React from "react";
 import { Bar } from "react-chartjs-2";
-import { Card } from "your-shadcn-ui-path"; // replace with actual import
-import useSWR from "swr";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+} from "chart.js";
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend
+);
+
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft } from "lucide-react";
@@ -58,12 +75,6 @@ const Page = () => {
     enabled: !!decodedRepo,
   });
 
-  const codeFreqQuery = useQuery({
-    queryKey: ["code-frequency", decodedRepo],
-    queryFn: () => fetchData("get-code-frequency", decodedRepo),
-    enabled: !!decodedRepo,
-  });
-
   const languagesQuery = useQuery({
     queryKey: ["languages", decodedRepo],
     queryFn: () => fetchData("get-languages", decodedRepo),
@@ -82,9 +93,16 @@ const Page = () => {
     enabled: !!decodedRepo,
   });
 
-  const topicsQuery = useQuery({
-    queryKey: ["topics", decodedRepo],
-    queryFn: () => fetchData("get-topics", decodedRepo),
+
+  const topCommittersQuery = useQuery({
+    queryKey: ["top-committers", decodedRepo],
+    queryFn: () => fetchData("get-top-committers", decodedRepo),
+    enabled: !!decodedRepo,
+  });
+
+  const weeklyCommitsQuery = useQuery({
+    queryKey: ["weekly-commits", decodedRepo],
+    queryFn: () => fetchData("get-weekly-commits", decodedRepo),
     enabled: !!decodedRepo,
   });
 
@@ -184,6 +202,7 @@ const Page = () => {
                     ))}
                   </div>
                 )}
+                
                 <p>
                   <strong>Open Issues:</strong>{" "}
                   {repoQuery.data.open_issues_count}
@@ -313,7 +332,7 @@ const Page = () => {
               <Skeleton className="h-6 w-full" />
             ) : (
               <ul>
-                {contributorsQuery.data.slice(0, 5).map((contrib, idx) => (
+                {contributorsQuery.data.slice(0, 10).map((contrib, idx) => (
                   <li key={idx}>
                     {contrib.login ? contrib.login : "Unknown"} –{" "}
                     {contrib.contributions ?? "Unknown"} commits
@@ -323,15 +342,40 @@ const Page = () => {
             )}
           </div>
           <div className="bg-white dark:bg-black p-4 rounded-2xl shadow-acternity w-full max-w-md h-auto mx-auto">
-            <h2 className="text-xl font-bold mb-2">Code Frequency</h2>
-            {codeFreqQuery.isLoading || !codeFreqQuery.data ? (
-              <Skeleton className="h-6 w-full" />
-            ) : codeFreqQuery.data.message ? (
-              <p>{codeFreqQuery.data.message}</p> // Shows generation message
-            ) : Array.isArray(codeFreqQuery.data) ? (
-              <p>Weeks of activity: {codeFreqQuery.data.length}</p> // Valid array here
+            <h2 className="text-xl font-bold mb-2">Top Committers</h2>
+            {topCommittersQuery.isLoading ? (
+              <Skeleton className="h-32 w-full" />
+            ) : topCommittersQuery.error ? (
+              <p className="text-red-600">Error loading data.</p>
             ) : (
-              <p>No code frequency data available</p> // Fallback for unexpected shape
+              <div className="relative w-full h-52">
+                <Bar
+                  data={{
+                    labels: topCommittersQuery.data.map((c: any) => c.login),
+                    datasets: [
+                      {
+                        label: "Commits",
+                        data: topCommittersQuery.data.map(
+                          (c: any) => c.contributions
+                        ),
+                        backgroundColor: "#0ea5e9",
+                        borderRadius: 6,
+                        maxBarThickness: 26,
+                      },
+                    ],
+                  }}
+                  options={{
+                    indexAxis: "y",
+                    plugins: { legend: { display: false } },
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                      x: { beginAtZero: true, grid: { display: false } },
+                      y: { grid: { display: false } },
+                    },
+                  }}
+                />
+              </div>
             )}
           </div>
 
@@ -404,16 +448,68 @@ const Page = () => {
             )}
           </div>
 
-          <div className="bg-white dark:bg-black p-4 rounded-2xl shadow-acternity w-full max-w-md h-auto mx-auto">
-            <h2 className="text-xl font-bold mb-2">Topics</h2>
-            {topicsQuery.isLoading ? (
-              <Skeleton className="h-6 w-full" />
+          <div className="bg-white dark:bg-black p-4 rounded-2xl shadow-acternity w-full max-w-md h-[400px] mx-auto">
+            <h2 className="text-xl font-bold mb-2">Commits This Year</h2>
+            {weeklyCommitsQuery.isLoading ? (
+              <Skeleton className="h-40 w-full" />
+            ) : weeklyCommitsQuery.error ? (
+              <p className="text-red-600">Error loading weekly commit stats.</p>
+            ) : weeklyCommitsQuery.data?.message ? (
+              <p>{weeklyCommitsQuery.data.message}</p>
             ) : (
-              <ul>
-                {topicsQuery.data.names.map((topic: string, idx: number) => (
-                  <li key={idx}>{topic}</li>
-                ))}
-              </ul>
+              <div className="relative w-full h-72">
+                <Bar
+                  data={{
+                    labels: weeklyCommitsQuery.data.map(
+                      (entry: any) => entry.week
+                    ),
+                    datasets: [
+                      {
+                        label: "Commits",
+                        data: weeklyCommitsQuery.data.map(
+                          (entry: any) => entry.total
+                        ),
+                        backgroundColor: "#22c55e", // nice green
+                        borderRadius: 4,
+                        maxBarThickness: 18,
+                      },
+                    ],
+                  }}
+                  options={{
+                    plugins: {
+                      legend: { display: false },
+                      tooltip: {
+                        enabled: true,
+                        callbacks: {
+                          label: (context) => `Commits: ${context.parsed.y}`,
+                          title: (items) => `Week of ${items[0].label}`,
+                        },
+                      },
+                      title: {
+                        display: true,
+                        text: "Commits per Week (Hover for details)",
+                        font: { size: 18 },
+                      },
+                    },
+                    scales: {
+                      x: {
+                        grid: { display: false },
+                        ticks: {
+                          autoSkip: true,
+                          maxTicksLimit: 12,
+                        },
+                      },
+                      y: {
+                        beginAtZero: true,
+                        grid: { display: true, color: "#e5e7eb" },
+                        title: { display: true, text: "Commits" },
+                      },
+                    },
+                    responsive: true,
+                    maintainAspectRatio: false,
+                  }}
+                />
+              </div>
             )}
           </div>
         </div>

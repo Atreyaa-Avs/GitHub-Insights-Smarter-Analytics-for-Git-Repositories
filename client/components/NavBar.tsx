@@ -32,7 +32,7 @@ const NavBar = () => {
   return (
     <motion.nav
       className="
-        fixed z-50 
+        fixed z-40 
         bg-white dark:bg-neutral-800 
         left-1/2 transform -translate-x-1/2 
         border border-[#ccc] dark:border-gray-600 

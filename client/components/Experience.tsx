@@ -19,7 +19,7 @@ const Experience = () => {
           experience.
         </p>
         <div className="group mx-auto mt-14">
-          <Button className="p-0 text-xl py-7 !px-12 cursor-pointer">
+          <Button className="text-xl py-7 px-12 cursor-pointer">
             Try Now{" "}
             <span className="group-hover:pl-1 transition-all duration-75 ease-in">
               <MoveRight />

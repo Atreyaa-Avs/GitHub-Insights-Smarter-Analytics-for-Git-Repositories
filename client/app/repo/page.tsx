@@ -192,7 +192,7 @@ const Page = () => {
                 </p>
                 {repoQuery.data.topics && repoQuery.data.topics.length > 0 && (
                   <div className="flex flex-wrap gap-1 mt-2">
-                    {repoQuery.data.topics.map((topic) => (
+                    {repoQuery.data.topics.map((topic : any) => (
                       <span
                         key={topic}
                         className="bg-blue-100 text-blue-700 rounded-full px-2 text-xs font-semibold"
@@ -235,7 +235,7 @@ const Page = () => {
               <>
                 <p>Total Commits: {commitsQuery.data.totalCommits}</p>
                 <ul className="mt-4 space-y-2">
-                  {commitsQuery.data.recentCommits.map((commit, idx) => (
+                  {commitsQuery.data.recentCommits.map((commit:any, idx: number) => (
                     <li
                       key={idx}
                       className="border-b border-gray-200 pb-2 dark:border-gray-700"
@@ -272,7 +272,7 @@ const Page = () => {
                 <p>Total PRs: {pullsQuery.data.totalCount}</p>{" "}
                 {/* Use totalCount */}
                 <ul className="mt-4 space-y-2">
-                  {pullsQuery.data?.pulls.map((pr, idx) => {
+                  {pullsQuery.data?.pulls.map((pr: any, idx: number) => {
                     const shortTitle =
                       pr.title.split(" ").slice(0, 10).join(" ") +
                       (pr.title.split(" ").length > 10 ? "..." : "");
@@ -303,7 +303,7 @@ const Page = () => {
                 <p>Total Issues: {issuesQuery.data.totalCount}</p>{" "}
                 {/* Use totalCount */}
                 <ul className="mt-4 space-y-2">
-                  {issuesQuery.data.issues.map((issue, idx) => {
+                  {issuesQuery.data.issues.map((issue:any, idx: number) => {
                     const shortTitle =
                       issue.title.split(" ").slice(0, 10).join(" ") +
                       (issue.title.split(" ").length > 10 ? "..." : "");
@@ -332,7 +332,7 @@ const Page = () => {
               <Skeleton className="h-6 w-full" />
             ) : (
               <ul>
-                {contributorsQuery.data.slice(0, 10).map((contrib, idx) => (
+                {contributorsQuery.data.slice(0, 10).map((contrib:any , idx: number) => (
                   <li key={idx}>
                     {contrib.login ? contrib.login : "Unknown"} –{" "}
                     {contrib.contributions ?? "Unknown"} commits
@@ -386,7 +386,7 @@ const Page = () => {
               <Skeleton className="h-6 w-full" />
             ) : (
               <ul>
-                {Object.entries(languagesQuery.data)
+                {(Object.entries(languagesQuery.data) as [string, number][])
                   .sort((a, b) => b[1] - a[1]) // sort descending by bytes
                   .slice(0, 15) // take top 15
                   .map(([lang, bytes]) => (
@@ -410,7 +410,7 @@ const Page = () => {
               <>
                 <p>Total weeks: {participationQuery.data.all.length}</p>
                 <ul className="mt-2 flex-1 overflow-auto scrollbar-hide">
-                  {participationQuery.data.all.map((count, idx) => (
+                  {participationQuery.data.all.map((count : any, idx: number) => (
                     <li key={idx}>
                       Week {idx + 1}: {count} commits
                     </li>
@@ -429,7 +429,7 @@ const Page = () => {
               <>
                 <p>Total Releases: {releasesQuery.data.totalCount}</p>
                 <ul className="mt-4 space-y-2">
-                  {releasesQuery.data.releases.map((release, idx) => (
+                  {releasesQuery.data.releases.map((release : any, idx : number) => (
                     <li
                       key={idx}
                       className="border-b border-gray-200 pb-2 dark:border-gray-700"

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { NumberTicker } from "./magicui/number-ticker";
 import { Ripple } from "./magicui/ripple";
 import { motion } from "motion/react";
+import Image from "next/image";
 
 interface MainLoaderProps {
   setDeleteLoading: React.Dispatch<React.SetStateAction<boolean>>;
@@ -51,9 +52,15 @@ const MainLoader = ({ setDeleteLoading }: MainLoaderProps) => {
       onAnimationComplete={handleAnimationComplete}
     >
       <div className="flex items-center justify-center min-h-dvh">
-        <p className="z-10 text-center text-2xl xl:text-4xl font-medium tracking-tight text-gray-700">
-          Loading...
-        </p>
+        <div className="z-10 text-center text-2xl xl:text-4xl font-medium tracking-tight text-gray-700">
+          <Image
+            src="/onlyLogo.png"
+            alt="Gitlytics"
+            width={1550}
+            height={1550}
+            className="w-full h-auto max-w-[180px]"
+          />
+        </div>
         <div className="block md:hidden">
           <Ripple mainCircleSize={150} numCircles={4} />
         </div>

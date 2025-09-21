@@ -6,6 +6,7 @@ import "./globals.css";
 import localFont from "next/font/local";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
+import PageTransition from "./PageTransition";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -63,6 +64,7 @@ export default function RootLayout({
     >
       <head>
         <title>{String(metadata.title ?? "")}</title>
+        <link rel="preload" href="/onlyLogo.png" as="image" />
         <meta name="description" content={metadata.description ?? ""} />
         <meta
           name="viewport"
@@ -71,7 +73,7 @@ export default function RootLayout({
       </head>
       <body className="antialiased">
         <QueryClientProvider client={queryClient}>
-          {children}
+          <PageTransition>{children}</PageTransition>
         </QueryClientProvider>
       </body>
     </html>

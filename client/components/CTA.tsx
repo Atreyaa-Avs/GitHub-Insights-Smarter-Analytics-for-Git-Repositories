@@ -69,10 +69,10 @@ const CTA = () => {
           className="relative py-5 overflow-hidden hover:cursor-pointer"
           size="lg"
           variant="outline"
-          onClick={() => router.push("/chat")}
+          onClick={() => router.push("/chatbot")}
         >
           <SquareArrowOutUpRight />
-          Go to Chat
+          Go to Chatbot
           <BorderBeam
             size={40}
             initialOffset={20}

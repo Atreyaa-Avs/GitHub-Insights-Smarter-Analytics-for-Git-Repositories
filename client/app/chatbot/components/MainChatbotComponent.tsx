@@ -217,7 +217,7 @@ const MainChatbotComponent = () => {
         <ConversationWrapper messages={messages} />
 
         {thinking && (
-          <div className="flex items-end space-x-3">
+          <div className="flex items-end space-x-3 ml-4 pb-5">
             <Skeleton className="size-7 2xl:size-10 rounded-full" />
             <div className="flex w-full flex-col space-y-2">
               <Skeleton className="h-4 w-[70%]" />

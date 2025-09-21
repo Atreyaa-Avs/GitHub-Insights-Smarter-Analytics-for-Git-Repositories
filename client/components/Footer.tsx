@@ -129,7 +129,7 @@ const Footer = () => {
                   </div>
                 ))}
               </div>
-              <div className="bg-black text-white font-inter p-4 rounded-md mt-4">
+              <div className="bg-black text-white font-inter p-4 rounded-md mt-8">
                 <p className="mb-2 font-semibold">
                   Don't miss out on GitLytics updates!
                 </p>

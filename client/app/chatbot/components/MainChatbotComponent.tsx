@@ -212,17 +212,17 @@ const MainChatbotComponent = () => {
   const handleModelChange = (newModel: string) => setModel(newModel);
 
   return (
-    <div className="flex flex-col flex-1 max-w-5xl mx-auto p-6 rounded-lg border shadow-acternity">
+    <div className="flex flex-col flex-1 max-w-3xl 2xl:max-w-5xl mx-auto p-6 rounded-lg border shadow-acternity">
       <div className="flex flex-col h-full space-y-4">
         <ConversationWrapper messages={messages} />
 
         {thinking && (
-          <div className="flex items-end space-x-3">
-            <Skeleton className="h-10 w-10 rounded-full" />
-            <div className="flex flex-col space-y-2">
-              <Skeleton className="h-4 w-[650px]" />
-              <Skeleton className="h-4 w-[600px]" />
-              <Skeleton className="h-4 w-[550px]" />
+          <div className="flex items-end space-x-3 ml-4 pb-5">
+            <Skeleton className="size-7 2xl:size-10 rounded-full" />
+            <div className="flex w-full flex-col space-y-2">
+              <Skeleton className="h-4 w-[70%]" />
+              <Skeleton className="h-4 w-[65%]" />
+              <Skeleton className="h-4 w-[60%]" />
             </div>
           </div>
         )}

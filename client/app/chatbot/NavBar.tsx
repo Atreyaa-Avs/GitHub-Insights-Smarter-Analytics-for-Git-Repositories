@@ -39,7 +39,7 @@ const NavBar = () => {
                 alt="Gitlytics"
                 width={1550}
                 height={1550}
-                className="w-full h-auto max-w-[150px]"
+                className="w-full h-auto max-w-[120px] 2xl:max-w-[150px]"
               />
           </Link>
         </div>
@@ -50,7 +50,7 @@ const NavBar = () => {
             <Link
               key={idx}
               href={link.href}
-              className="mx-2 text-gray-800 dark:text-gray-200 hover:underline font-semibold text-lg"
+              className="mx-2 text-gray-800 dark:text-gray-200 hover:underline font-semibold 2xl:text-lg"
             >
               {link.name}
             </Link>

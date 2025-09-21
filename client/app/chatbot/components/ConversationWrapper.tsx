@@ -98,7 +98,7 @@ const ConversationWrapper = ({ messages }: Props) => {
                     case "text":
                       return (
                         <Response
-                          className="font-medium font-inter"
+                          className="max-2xl:text-xs font-medium font-inter"
                           key={`${message.id}-${i}`}
                         >
                           {part.text}

@@ -62,8 +62,8 @@ const PromptInputWrapper = ({
   models,
 }: Props) => {
   return (
-    <PromptInput onSubmit={handleSubmit} className="mt-4" globalDrop multiple>
-      <PromptInputBody>
+    <PromptInput onSubmit={handleSubmit} className='max-2xl:max-w-2xl max-2xl:mx-auto' globalDrop multiple>
+      <PromptInputBody className=''>
         <PromptInputAttachments>
           {(attachment) => <PromptInputAttachment data={attachment} />}
         </PromptInputAttachments>
@@ -103,7 +103,7 @@ const PromptInputWrapper = ({
 
           {/* Nested model dropdown */}
           <DropdownMenu>
-            <DropdownMenuTrigger className="px-3 py-2 text-sm border rounded-md">
+            <DropdownMenuTrigger className="px-3 py-2 text-xs 2xl:text-sm border rounded-md">
               <div className='flex items-center'>
                 {models
                   .flatMap((c) => c.models)
@@ -115,12 +115,13 @@ const PromptInputWrapper = ({
             <DropdownMenuContent>
               {models.map((company) => (
                 <DropdownMenuSub key={company.company}>
-                  <DropdownMenuSubTrigger>{company.company}</DropdownMenuSubTrigger>
+                  <DropdownMenuSubTrigger className='text-xs 2xl:text-sm'>{company.company}</DropdownMenuSubTrigger>
                   <DropdownMenuSubContent>
                     {company.models.map((m) => (
                       <DropdownMenuItem
                         key={m.id}
                         onSelect={() => setModel(m.id)}
+                        className='text-xs 2xl:text-sm'
                       >
                         {m.name}
                       </DropdownMenuItem>

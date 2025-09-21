@@ -57,7 +57,7 @@ const NavBar = () => {
                 alt="Gitlytics"
                 width={1550}
                 height={1550}
-                className="w-full h-auto max-w-[150px]"
+                className="w-full h-auto max-w-[120px] 2xl:max-w-[150px]"
               />
             </Link>
           </motion.div>

@@ -93,7 +93,6 @@ const Page = () => {
     enabled: !!decodedRepo,
   });
 
-
   const topCommittersQuery = useQuery({
     queryKey: ["top-committers", decodedRepo],
     queryFn: () => fetchData("get-top-committers", decodedRepo),
@@ -134,96 +133,132 @@ const Page = () => {
           {/* Row 1 */}
           <div className="bg-white dark:bg-black p-4 rounded-2xl shadow-acternity w-full max-w-md h-auto mx-auto">
             <h2 className="text-xl font-bold mb-2">Repository Overview</h2>
-            {repoQuery.isLoading ? (
+
+            {repoQuery.isPending ? (
               <Skeleton className="h-6 w-full" />
+            ) : repoQuery.isError ? (
+              <p className="text-red-500">
+                {(repoQuery.error as Error)?.message ??
+                  "Failed to load repository"}
+              </p>
             ) : (
-              <div>
-                <p>
-                  <strong>Name:</strong> {repoQuery.data.name}
-                </p>
-                <p>
-                  <strong>Description:</strong> {repoQuery.data.description}
-                </p>
-                <p>
-                  <strong>Stars:</strong> {repoQuery.data.stargazers_count}
-                </p>
-                <p>
-                  <strong>Watchers:</strong>{" "}
-                  {repoQuery.data.subscribers_count ||
-                    repoQuery.data.watchers_count}
-                </p>
-                <p>
-                  <strong>Forks:</strong> {repoQuery.data.forks_count}
-                </p>
-                <p>
-                  <strong>Branches:</strong> {repoQuery.data.branch_count}
-                </p>
-                <p>
-                  <strong>Tags:</strong> {repoQuery.data.tag_count}
-                </p>
-                <p>
-                  <strong>Main Language:</strong> {repoQuery.data.language}
-                </p>
-                <p>
-                  <strong>Size:</strong>{" "}
-                  {(repoQuery.data.size / 1024).toFixed(1)} MB
-                </p>
-                <p>
-                  <strong>License:</strong>{" "}
-                  {repoQuery.data.license?.name || "N/A"}
-                </p>
-                <p>
-                  <strong>Default Branch:</strong>{" "}
-                  {repoQuery.data.default_branch}
-                </p>
-                <p>
-                  <strong>Created:</strong>{" "}
-                  {new Date(repoQuery.data.created_at).toLocaleDateString()}
-                </p>
-                <p>
-                  <strong>Last Updated:</strong>{" "}
-                  {new Date(repoQuery.data.updated_at).toLocaleDateString()}
-                </p>
-                <p>
-                  <strong>Last Commit:</strong>{" "}
-                  {repoQuery.data.last_commit
-                    ? new Date(repoQuery.data.last_commit).toLocaleDateString()
-                    : "N/A"}
-                </p>
-                {repoQuery.data.topics && repoQuery.data.topics.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {repoQuery.data.topics.map((topic : any) => (
-                      <span
-                        key={topic}
-                        className="bg-blue-100 text-blue-700 rounded-full px-2 text-xs font-semibold"
-                      >
-                        {topic}
-                      </span>
-                    ))}
+              (() => {
+                const data = repoQuery.data ?? {};
+
+                const name = data.name ?? "N/A";
+                const description = data.description ?? "—";
+                const stars = data.stargazers_count ?? 0;
+                const watchers =
+                  data.subscribers_count ?? data.watchers_count ?? 0;
+                const forks = data.forks_count ?? 0;
+                const branches = data.branch_count ?? 0;
+                const tags = data.tag_count ?? 0;
+                const language = data.language ?? "—";
+                const sizeKB = typeof data.size === "number" ? data.size : 0;
+                const sizeMB = (sizeKB / 1024).toFixed(1);
+
+                const licenseName =
+                  data.license?.name ?? data.license_name ?? "N/A";
+                const defaultBranch = data.default_branch ?? "—";
+
+                const createdAt = data.created_at
+                  ? new Date(data.created_at).toLocaleDateString()
+                  : "—";
+                const updatedAt = data.updated_at
+                  ? new Date(data.updated_at).toLocaleDateString()
+                  : "—";
+                const lastCommit = data.last_commit
+                  ? new Date(data.last_commit).toLocaleDateString()
+                  : "N/A";
+
+                const topics: string[] = Array.isArray(data.topics)
+                  ? data.topics
+                  : [];
+                const openIssues = data.open_issues_count ?? 0;
+                const openPRs = data.open_prs_count ?? 0;
+                const homepage = data.homepage ?? "";
+
+                return (
+                  <div>
+                    <p>
+                      <strong>Name:</strong> {name}
+                    </p>
+                    <p>
+                      <strong>Description:</strong> {description}
+                    </p>
+                    <p>
+                      <strong>Stars:</strong> {stars}
+                    </p>
+                    <p>
+                      <strong>Watchers:</strong> {watchers}
+                    </p>
+                    <p>
+                      <strong>Forks:</strong> {forks}
+                    </p>
+                    <p>
+                      <strong>Branches:</strong> {branches}
+                    </p>
+                    <p>
+                      <strong>Tags:</strong> {tags}
+                    </p>
+                    <p>
+                      <strong>Main Language:</strong> {language}
+                    </p>
+                    <p>
+                      <strong>Size:</strong> {sizeMB} MB
+                    </p>
+                    <p>
+                      <strong>License:</strong> {licenseName}
+                    </p>
+                    <p>
+                      <strong>Default Branch:</strong> {defaultBranch}
+                    </p>
+                    <p>
+                      <strong>Created:</strong> {createdAt}
+                    </p>
+                    <p>
+                      <strong>Last Updated:</strong> {updatedAt}
+                    </p>
+                    <p>
+                      <strong>Last Commit:</strong> {lastCommit}
+                    </p>
+
+                    {topics.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {topics.map((topic: string) => (
+                          <span
+                            key={topic}
+                            className="bg-blue-100 text-blue-700 rounded-full px-2 text-xs font-semibold"
+                          >
+                            {topic}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    <p>
+                      <strong>Open Issues:</strong> {openIssues}
+                    </p>
+                    <p>
+                      <strong>Open PRs:</strong> {openPRs}
+                    </p>
+
+                    {homepage && (
+                      <p>
+                        <strong>Homepage:</strong>{" "}
+                        <a
+                          href={homepage}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="underline text-blue-600"
+                        >
+                          {homepage}
+                        </a>
+                      </p>
+                    )}
                   </div>
-                )}
-                
-                <p>
-                  <strong>Open Issues:</strong>{" "}
-                  {repoQuery.data.open_issues_count}
-                </p>
-                <p>
-                  <strong>Open PRs:</strong> {repoQuery.data.open_prs_count}
-                </p>
-                {repoQuery.data.homepage && (
-                  <p>
-                    <strong>Homepage:</strong>{" "}
-                    <a
-                      href={repoQuery.data.homepage}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="underline text-blue-600"
-                    >
-                      {repoQuery.data.homepage}
-                    </a>
-                  </p>
-                )}
-              </div>
+                );
+              })()
             )}
           </div>
 
@@ -235,28 +270,30 @@ const Page = () => {
               <>
                 <p>Total Commits: {commitsQuery.data.totalCommits}</p>
                 <ul className="mt-4 space-y-2">
-                  {commitsQuery.data.recentCommits.map((commit:any, idx: number) => (
-                    <li
-                      key={idx}
-                      className="border-b border-gray-200 pb-2 dark:border-gray-700"
-                    >
-                      <p className="font-semibold">
-                        {commit.commit.message
-                          .split(" ")
-                          .slice(0, 10)
-                          .join(" ")}
-                        {commit.commit.message.split(" ").length > 10
-                          ? "..."
-                          : ""}
-                      </p>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        {commit.commit.author.name} on{" "}
-                        {new Date(
-                          commit.commit.author.date
-                        ).toLocaleDateString()}
-                      </p>
-                    </li>
-                  ))}
+                  {commitsQuery.data.recentCommits.map(
+                    (commit: any, idx: number) => (
+                      <li
+                        key={idx}
+                        className="border-b border-gray-200 pb-2 dark:border-gray-700"
+                      >
+                        <p className="font-semibold">
+                          {commit.commit.message
+                            .split(" ")
+                            .slice(0, 10)
+                            .join(" ")}
+                          {commit.commit.message.split(" ").length > 10
+                            ? "..."
+                            : ""}
+                        </p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          {commit.commit.author.name} on{" "}
+                          {new Date(
+                            commit.commit.author.date
+                          ).toLocaleDateString()}
+                        </p>
+                      </li>
+                    )
+                  )}
                 </ul>
               </>
             )}
@@ -303,7 +340,7 @@ const Page = () => {
                 <p>Total Issues: {issuesQuery.data.totalCount}</p>{" "}
                 {/* Use totalCount */}
                 <ul className="mt-4 space-y-2">
-                  {issuesQuery.data.issues.map((issue:any, idx: number) => {
+                  {issuesQuery.data.issues.map((issue: any, idx: number) => {
                     const shortTitle =
                       issue.title.split(" ").slice(0, 10).join(" ") +
                       (issue.title.split(" ").length > 10 ? "..." : "");
@@ -332,12 +369,14 @@ const Page = () => {
               <Skeleton className="h-6 w-full" />
             ) : (
               <ul>
-                {contributorsQuery.data.slice(0, 10).map((contrib:any , idx: number) => (
-                  <li key={idx}>
-                    {contrib.login ? contrib.login : "Unknown"} –{" "}
-                    {contrib.contributions ?? "Unknown"} commits
-                  </li>
-                ))}
+                {contributorsQuery.data
+                  .slice(0, 10)
+                  .map((contrib: any, idx: number) => (
+                    <li key={idx}>
+                      {contrib.login ? contrib.login : "Unknown"} –{" "}
+                      {contrib.contributions ?? "Unknown"} commits
+                    </li>
+                  ))}
               </ul>
             )}
           </div>
@@ -410,11 +449,13 @@ const Page = () => {
               <>
                 <p>Total weeks: {participationQuery.data.all.length}</p>
                 <ul className="mt-2 flex-1 overflow-auto scrollbar-hide">
-                  {participationQuery.data.all.map((count : any, idx: number) => (
-                    <li key={idx}>
-                      Week {idx + 1}: {count} commits
-                    </li>
-                  ))}
+                  {participationQuery.data.all.map(
+                    (count: any, idx: number) => (
+                      <li key={idx}>
+                        Week {idx + 1}: {count} commits
+                      </li>
+                    )
+                  )}
                 </ul>
               </>
             )}
@@ -429,20 +470,22 @@ const Page = () => {
               <>
                 <p>Total Releases: {releasesQuery.data.totalCount}</p>
                 <ul className="mt-4 space-y-2">
-                  {releasesQuery.data.releases.map((release : any, idx : number) => (
-                    <li
-                      key={idx}
-                      className="border-b border-gray-200 pb-2 dark:border-gray-700"
-                    >
-                      <p className="font-semibold">
-                        {release.name || release.tag_name}
-                      </p>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Published on{" "}
-                        {new Date(release.published_at).toLocaleDateString()}
-                      </p>
-                    </li>
-                  ))}
+                  {releasesQuery.data.releases.map(
+                    (release: any, idx: number) => (
+                      <li
+                        key={idx}
+                        className="border-b border-gray-200 pb-2 dark:border-gray-700"
+                      >
+                        <p className="font-semibold">
+                          {release.name || release.tag_name}
+                        </p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          Published on{" "}
+                          {new Date(release.published_at).toLocaleDateString()}
+                        </p>
+                      </li>
+                    )
+                  )}
                 </ul>
               </>
             )}

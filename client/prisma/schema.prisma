@@ -1,0 +1,214 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/*
+  Core: Repo and GhUser
+  - Adds counters used by the UI (stars, watchers/subscribers, forks, branch_count, tag_count, open_prs_count, open_issues_count, size, language, license_name, homepage, topics).
+  - Adds last_commit for “Repository Overview”.
+*/
+
+model Repo {
+  id               BigInt    @id @default(autoincrement())
+  owner            String
+  name             String
+  description      String?
+  visibility       String?
+  default_branch   String?
+  created_at       DateTime?
+  updated_at       DateTime?
+  pushed_at        DateTime?
+
+  // Overview counters used by the page
+  stargazers_count Int       @default(0)
+  watchers_count   Int       @default(0)          // GitHub legacy watchers (equals stars for REST v3)
+  subscribers_count Int      @default(0)          // “Watchers” (subscribers) used by UI fallback
+  forks_count      Int       @default(0)
+  branch_count     Int       @default(0)          // precomputed in ingestion
+  tag_count        Int       @default(0)          // precomputed in ingestion
+  open_prs_count   Int       @default(0)
+  open_issues_count Int      @default(0)
+  size_kb          Int       @default(0)          // GitHub repo.size returns KB; UI divides by 1024
+  language         String?                           // main language
+  license_name     String?                           // license?.name
+  homepage         String?
+  topics           String[]  @default([])           // used by the chips
+  last_commit      DateTime?                         // latest commit timestamp
+
+  // Relations
+  commits          Commit[]
+  issues           Issue[]
+  pulls            Pull[]
+  releases         Release[]
+  languages        RepoLanguage[]
+  participation    ParticipationStats[]
+  weeklyCommits    WeeklyCommit[]                   // for “Commits This Year”
+  contributorRanks ContributorRank[]                // for “Top Committers”
+
+  @@unique([owner, name], map: "owner_name")
+  @@index([updated_at])
+  @@index([pushed_at])
+}
+
+model GhUser {
+  id         BigInt   @id @default(autoincrement())
+  login      String   @unique
+  avatar_url String?
+  type       String?
+
+  commits_authored  Commit[] @relation("Author")
+  commits_committed Commit[] @relation("Committer")
+  issues            Issue[]  @relation("IssueAuthor")
+  pulls             Pull[]   @relation("PullAuthor")
+
+  contributorRanks  ContributorRank[]
+}
+
+/*
+  Commits, Issues, Pulls, Releases
+  - Keep shapes compatible with UI and queries.
+*/
+
+model Commit {
+  id             BigInt   @id @default(autoincrement())
+  sha            String   @unique
+  message        String?
+  committed_at   DateTime?
+  repo_id        BigInt
+  repo           Repo     @relation(fields: [repo_id], references: [id])
+
+  // Relations to GhUser
+  author_login   String?
+  author         GhUser?  @relation("Author", fields: [author_login], references: [login])
+  committer_login String?
+  committer       GhUser? @relation("Committer", fields: [committer_login], references: [login])
+
+  @@index([repo_id, committed_at])
+}
+
+model Issue {
+  id            BigInt   @id @default(autoincrement())
+  issue_number  Int
+  title         String?
+  state         String?                         // open/closed
+  created_at    DateTime?
+  updated_at    DateTime?
+  closed_at     DateTime?
+  repo_id       BigInt
+  repo          Repo     @relation(fields: [repo_id], references: [id])
+
+  author_login  String?
+  author        GhUser?  @relation("IssueAuthor", fields: [author_login], references: [login])
+
+  @@unique([repo_id, issue_number])
+  @@index([repo_id, state, created_at])
+}
+
+model Pull {
+  id           BigInt   @id @default(autoincrement())
+  pr_number    Int
+  title        String?
+  state        String?                         // open/closed
+  created_at   DateTime?
+  updated_at   DateTime?
+  closed_at    DateTime?
+  merged_at    DateTime?
+  repo_id      BigInt
+  repo         Repo     @relation(fields: [repo_id], references: [id])
+
+  author_login String?
+  author       GhUser?  @relation("PullAuthor", fields: [author_login], references: [login])
+
+  @@unique([repo_id, pr_number])
+  @@index([repo_id, state, created_at])
+  @@index([repo_id, merged_at])
+}
+
+model Release {
+  id            BigInt   @id @default(autoincrement())
+  release_id    BigInt   @unique                 // GitHub numeric id
+  tag_name      String?
+  name          String?
+  created_at    DateTime?
+  published_at  DateTime?
+  repo_id       BigInt
+  repo          Repo     @relation(fields: [repo_id], references: [id])
+
+  @@index([repo_id, published_at])
+}
+
+/*
+  Languages panel
+  - Unique per (repo, language) to support idempotent upserts.
+  - Store bytes to match UI listing.
+*/
+
+model RepoLanguage {
+  id            BigInt  @id @default(autoincrement())
+  language      String
+  bytes_of_code BigInt
+  repo_id       BigInt
+  repo          Repo    @relation(fields: [repo_id], references: [id])
+
+  @@unique([repo_id, language])
+  @@index([repo_id])
+}
+
+/*
+  Participation (all/owner arrays in the UI)
+  - Store weekly bucket with both all_commits and owner_commits.
+  - Unique per (repo, week_start) for dedupe.
+*/
+
+model ParticipationStats {
+  id            BigInt   @id @default(autoincrement())
+  week_start    DateTime                             // normalized to Sunday UTC
+  all_commits   Int
+  owner_commits Int
+  repo_id       BigInt
+  repo          Repo     @relation(fields: [repo_id], references: [id])
+
+  @@unique([repo_id, week_start])
+  @@index([repo_id, week_start])
+}
+
+/*
+  Commits This Year chart
+  - If using a separate endpoint returning [{week, total}], keep a compact table for the current rolling year.
+  - week is an ISO week-start date string or DateTime; UI reads .week and .total.
+*/
+
+model WeeklyCommit {
+  id        BigInt   @id @default(autoincrement())
+  repo_id   BigInt
+  repo      Repo     @relation(fields: [repo_id], references: [id])
+  week      DateTime                             // start of week (UTC)
+  total     Int
+
+  @@unique([repo_id, week])
+  @@index([repo_id, week])
+}
+
+/*
+  Top Committers (horizontal bar)
+  - Snapshot table keyed by (repo, user). “contributions” feeds the chart and the contributors list.
+  - Keep in sync with GitHub /commits or /contributors endpoint during ingestion.
+*/
+
+model ContributorRank {
+  id            BigInt  @id @default(autoincrement())
+  repo_id       BigInt
+  repo          Repo    @relation(fields: [repo_id], references: [id])
+  user_login    String
+  user          GhUser? @relation(fields: [user_login], references: [login])
+  contributions Int      @default(0)
+
+  @@unique([repo_id, user_login])
+  @@index([repo_id, contributions])
+}

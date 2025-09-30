@@ -23,6 +23,13 @@ async function getCountFromPaginatedApi(url: string, token: string) {
   return Array.isArray(data) ? data.length : 0;
 }
 
+// ------------------- BigInt-safe JSON helper -------------------
+function safeJSON(obj: any) {
+  return JSON.parse(
+    JSON.stringify(obj, (_, value) => (typeof value === "bigint" ? value.toString() : value))
+  );
+}
+
 // ------------------- GET: fetch repo from DB -------------------
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -38,30 +45,21 @@ export async function GET(request: NextRequest) {
   const [owner, name] = repoUrl.split("/");
 
   try {
-    let repo = await prisma.repo.findUnique({
+    const repo = await prisma.repo.findUnique({
       where: { owner_name: { owner, name } },
+      include: { commits: true },
     });
 
-    // If repo not in DB, fallback to POST logic
     if (!repo) {
-      // reuse the POST function
-      const postResponse = await POST(request);
-      return postResponse;
+      // Fallback to POST logic to fetch & insert
+      return POST(request);
     }
 
-    return NextResponse.json(
-      JSON.parse(
-        JSON.stringify(repo, (key, value) =>
-          typeof value === "bigint" ? value.toString() : value
-        )
-      )
-    );
+    // Return BigInt-safe JSON
+    return NextResponse.json(safeJSON(repo));
   } catch (error) {
     console.error(error);
-    return NextResponse.json(
-      { error: "Internal Server Error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }
 
@@ -89,15 +87,12 @@ export async function POST(request: NextRequest) {
 
   try {
     // Fetch main repo details
-    const repoRes = await fetch(
-      `https://api.github.com/repos/${owner}/${name}`,
-      {
-        headers: {
-          Accept: "application/vnd.github+json",
-          Authorization: `Bearer ${githubAccessToken}`,
-        },
-      }
-    );
+    const repoRes = await fetch(`https://api.github.com/repos/${owner}/${name}`, {
+      headers: {
+        Accept: "application/vnd.github+json",
+        Authorization: `Bearer ${githubAccessToken}`,
+      },
+    });
 
     if (!repoRes.ok) {
       return NextResponse.json(
@@ -108,13 +103,12 @@ export async function POST(request: NextRequest) {
 
     const repoData = await repoRes.json();
 
-    // Fetch branch count
+    // Fetch branch and tag counts
     const branchCount = await getCountFromPaginatedApi(
       `https://api.github.com/repos/${owner}/${name}/branches`,
       githubAccessToken
     );
 
-    // Fetch tag count
     const tagCount = await getCountFromPaginatedApi(
       `https://api.github.com/repos/${owner}/${name}/tags`,
       githubAccessToken
@@ -123,28 +117,25 @@ export async function POST(request: NextRequest) {
     // Fetch open PR count via Search API
     const prSearchRes = await fetch(
       `https://api.github.com/search/issues?q=repo:${owner}/${name}+is:pr+is:open&per_page=1`,
-      {
-        headers: {
-          Accept: "application/vnd.github+json",
-          Authorization: `Bearer ${githubAccessToken}`,
-        },
-      }
+      { headers: { Accept: "application/vnd.github+json", Authorization: `Bearer ${githubAccessToken}` } }
     );
-
     const prSearchData = await prSearchRes.json();
     const openPrsCount = prSearchData.total_count ?? 0;
+
+    // Fetch open issues count via Search API
+    const issuesSearchRes = await fetch(
+      `https://api.github.com/search/issues?q=repo:${owner}/${name}+is:issue+is:open&per_page=1`,
+      { headers: { Accept: "application/vnd.github+json", Authorization: `Bearer ${githubAccessToken}` } }
+    );
+    const issuesSearchData = await issuesSearchRes.json();
+    const openIssuesCount = issuesSearchData.total_count ?? 0;
 
     // Fetch last commit date
     let lastCommitDate: string | null = null;
     try {
       const commitRes = await fetch(
         `https://api.github.com/repos/${owner}/${name}/commits?per_page=1`,
-        {
-          headers: {
-            Accept: "application/vnd.github+json",
-            Authorization: `Bearer ${githubAccessToken}`,
-          },
-        }
+        { headers: { Accept: "application/vnd.github+json", Authorization: `Bearer ${githubAccessToken}` } }
       );
       if (commitRes.ok) {
         const commitData = await commitRes.json();
@@ -165,17 +156,22 @@ export async function POST(request: NextRequest) {
         default_branch: repoData.default_branch,
         stargazers_count: repoData.stargazers_count,
         watchers_count: repoData.watchers_count,
+        subscribers_count: repoData.subscribers_count ?? 0,
         forks_count: repoData.forks_count,
         size_kb: repoData.size,
         language: repoData.language,
         license_name: repoData.license?.name,
         homepage: repoData.homepage,
+        topics: repoData.topics ?? [],
         updated_at: new Date(repoData.updated_at),
         pushed_at: new Date(repoData.pushed_at),
         branch_count: branchCount,
         tag_count: tagCount,
         open_prs_count: openPrsCount,
+        open_issues_count: openIssuesCount,
         last_commit: lastCommitDate ? new Date(lastCommitDate) : null,
+        avatar_url: repoData.owner?.avatar_url ?? null,
+        html_url: repoData.html_url,
       },
       create: {
         owner,
@@ -185,27 +181,30 @@ export async function POST(request: NextRequest) {
         default_branch: repoData.default_branch,
         stargazers_count: repoData.stargazers_count,
         watchers_count: repoData.watchers_count,
+        subscribers_count: repoData.subscribers_count ?? 0,
         forks_count: repoData.forks_count,
         size_kb: repoData.size,
         language: repoData.language,
         license_name: repoData.license?.name,
         homepage: repoData.homepage,
+        topics: repoData.topics ?? [],
         created_at: new Date(repoData.created_at),
         updated_at: new Date(repoData.updated_at),
         pushed_at: new Date(repoData.pushed_at),
         branch_count: branchCount,
         tag_count: tagCount,
         open_prs_count: openPrsCount,
+        open_issues_count: openIssuesCount,
         last_commit: lastCommitDate ? new Date(lastCommitDate) : null,
+        avatar_url: repoData.owner?.avatar_url ?? null,
+        html_url: repoData.html_url,
       },
     });
 
-    return NextResponse.json({ message: "Repo data saved successfully", repo });
+    // Return BigInt-safe JSON only
+    return NextResponse.json(safeJSON({ message: "Repo data saved successfully", repo }));
   } catch (error) {
     console.error(error);
-    return NextResponse.json(
-      { error: "Internal Server Error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }

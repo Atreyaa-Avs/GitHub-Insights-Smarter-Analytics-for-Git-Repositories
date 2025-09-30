@@ -19,7 +19,6 @@ import MainLoader from "@/components/MainLoader";
 const page = () => {
   const [deleteLoading, setDeleteLoading] = useState(false);
 
-
   return (
     <div className="bg-neutral-100 dark:bg-black">
       <div className={`absolute inset-0 ${deleteLoading && "hidden"}`}>

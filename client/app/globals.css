@@ -5,6 +5,7 @@
 
 html {
   font-family: var(--font-gilroy), sans-serif;
+  font-weight: 450;
 }
 
 @theme inline {

@@ -133,12 +133,12 @@ const Repo = () => {
   }
 
   return (
-    <div className="flex-1 p-3 overflow-auto">
-      <div className="grid grid-cols-1 gap-4 px-8">
-        <div className="bg-white dark:bg-black p-4 rounded-2xl shadow-acternity w-full max-w-md h-auto mx-auto">
-          <h2 className="text-xl font-bold mb-2">Repository Overview</h2>
+    <div className="flex-1 mt-4 overflow-auto">
+      <div className="grid grid-cols-1">
+        <div className="bg-white dark:bg-black p-4 rounded-2xl shadow-acternity w-full h-auto">
+          <h2 className="text-2xl font-bold mt-3 mb-4">Repository Overview</h2>
 
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-3">
             <p className="inline-flex items-center gap-2">
               <strong>Name:</strong> {renderField(data?.name)}
             </p>

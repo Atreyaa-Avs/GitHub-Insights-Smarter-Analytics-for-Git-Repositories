@@ -1,49 +1,20 @@
 import { prisma } from "@/utils/prisma";
 import { NextRequest, NextResponse } from "next/server";
 
-// ------------------- GET: fetch contributors from DB -------------------
-export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const repoUrl = searchParams.get("repoUrl");
-
-  if (!repoUrl || !repoUrl.includes("/")) {
-    return NextResponse.json(
-      { error: "Valid repoUrl is required (owner/repo)" },
-      { status: 400 }
-    );
-  }
-
-  const [owner, name] = repoUrl.split("/");
-
-  try {
-    // Find the repo first
-    const repo = await prisma.repo.findUnique({
-      where: { owner_name: { owner, name } },
-    });
-
-    if (!repo) {
-      return NextResponse.json({ error: "Repo not found in DB" }, { status: 404 });
-    }
-
-    // Fetch contributors from ContributorRank table
-    const contributors = await prisma.contributorRank.findMany({
-      where: { repo_id: repo.id },
-      include: { user: true },
-      orderBy: { contributions: "desc" },
-    });
-
-    return NextResponse.json(contributors);
-  } catch (error) {
-    console.error(error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
-  }
+// ---------------------- Helper: normalize contributor ----------------------
+function normalizeContributor(c: any) {
+  return {
+    login: c.user?.login || c.login || "Unknown",
+    avatar_url: c.user?.avatar_url || c.avatar_url || "",
+    type: c.user?.type || c.type || "User",
+    contributions: c.contributions || 0,
+  };
 }
 
-// ------------------- POST: fetch contributors from GitHub & save to DB -------------------
+// ---------------------- POST: Fetch from GitHub & upsert ----------------------
 export async function POST(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const repoUrl = searchParams.get("repoUrl");
-
   if (!repoUrl || !repoUrl.includes("/")) {
     return NextResponse.json(
       { error: "Valid repoUrl is required (owner/repo)" },
@@ -51,47 +22,51 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const [owner, name] = repoUrl.split("/");
   const githubAccessToken = process.env.GITHUB_ACCESS_TOKEN;
   if (!githubAccessToken) {
-    return NextResponse.json({ error: "GitHub token not configured" }, { status: 500 });
+    return NextResponse.json(
+      { error: "GitHub token not configured" },
+      { status: 500 }
+    );
   }
 
-  const [owner, name] = repoUrl.split("/");
-
   try {
-    // Get repo
-    const repo = await prisma.repo.findUnique({
-      where: { owner_name: { owner, name } },
-    });
+    console.log(`🔄 [POST] Fetching contributors for ${owner}/${name}`);
 
-    if (!repo) {
-      return NextResponse.json({ error: "Repo not found in DB" }, { status: 404 });
-    }
+    // Ensure repo exists
+    const repo = await prisma.repo.upsert({
+      where: { owner_name: { owner, name } },
+      update: {},
+      create: { owner, name },
+    });
 
     // Fetch contributors from GitHub API
-    const response = await fetch(`https://api.github.com/repos/${owner}/${name}/contributors?per_page=100`, {
-      headers: {
-        Accept: "application/vnd.github+json",
-        Authorization: `Bearer ${githubAccessToken}`,
-      },
-    });
+    const res = await fetch(
+      `https://api.github.com/repos/${owner}/${name}/contributors?per_page=100`,
+      {
+        headers: {
+          Accept: "application/vnd.github+json",
+          Authorization: `Bearer ${githubAccessToken}`,
+        },
+      }
+    );
 
-    if (!response.ok) {
-      return NextResponse.json({ error: "GitHub API error", status: response.status });
-    }
+    if (!res.ok) throw new Error(`GitHub API error: ${res.status}`);
+    const contributorsData = await res.json();
 
-    const contributorsData = await response.json();
+    console.log(
+      `✅ [POST] Received ${contributorsData.length} contributors for ${owner}/${name}`
+    );
 
-    // Upsert each contributor into GhUser + ContributorRank
+    // Upsert each contributor into ghUser + contributorRank
     for (const c of contributorsData) {
-      // Upsert user
       await prisma.ghUser.upsert({
         where: { login: c.login },
         update: { avatar_url: c.avatar_url, type: c.type },
         create: { login: c.login, avatar_url: c.avatar_url, type: c.type },
       });
 
-      // Upsert ContributorRank
       await prisma.contributorRank.upsert({
         where: { repo_id_user_login: { repo_id: repo.id, user_login: c.login } },
         update: { contributions: c.contributions },
@@ -103,9 +78,82 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    return NextResponse.json({ message: "Contributors saved successfully" });
+    // Normalize top contributors for frontend
+    const topContributors = contributorsData
+      .sort((a: any, b: any) => b.contributions - a.contributions)
+      .slice(0, 50)
+      .map(normalizeContributor);
+
+    return NextResponse.json({
+      totalContributors: contributorsData.length,
+      topContributors,
+    });
   } catch (error) {
-    console.error(error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    console.error("POST error:", error);
+    return NextResponse.json(
+      { error: "Internal Server Error" },
+      { status: 500 }
+    );
+  }
+}
+
+// ---------------------- GET: Fetch from DB (fallback to POST) ----------------------
+export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
+  const repoUrl = searchParams.get("repoUrl");
+  if (!repoUrl || !repoUrl.includes("/")) {
+    return NextResponse.json(
+      { error: "Valid repoUrl is required (owner/repo)" },
+      { status: 400 }
+    );
+  }
+
+  const [owner, name] = repoUrl.split("/");
+
+  try {
+    // Find repo in DB
+    const repo = await prisma.repo.findUnique({
+      where: { owner_name: { owner, name } },
+    });
+
+    // If repo doesn't exist, fallback to POST
+    if (!repo) {
+      console.log(`⚠️ [GET] Repo ${owner}/${name} not found. Falling back to POST...`);
+      return POST(request);
+    }
+
+    // Get contributors from DB
+    const contributorsRaw = await prisma.contributorRank.findMany({
+      where: { repo_id: repo.id },
+      include: { user: true },
+      orderBy: { contributions: "desc" },
+      take: 50,
+    });
+
+    // Fallback if contributors are empty
+    if (contributorsRaw.length === 0) {
+      console.log(
+        `⚠️ [GET] No contributors found in DB for ${owner}/${name}. Fetching fresh from GitHub...`
+      );
+      return POST(request);
+    }
+
+    const topContributors = contributorsRaw.map(normalizeContributor);
+
+    // Get contributor count (for stats)
+    const totalContributors = await prisma.contributorRank.count({
+      where: { repo_id: repo.id },
+    });
+
+    return NextResponse.json({
+      totalContributors,
+      topContributors,
+    });
+  } catch (error) {
+    console.error("GET error:", error);
+    return NextResponse.json(
+      { error: "Internal Server Error" },
+      { status: 500 }
+    );
   }
 }

@@ -1,121 +1,220 @@
 import { prisma } from "@/utils/prisma";
 import { NextRequest, NextResponse } from "next/server";
 
-// ------------------- GET: fetch participation stats from DB -------------------
+// -----------------------------------------------------------------------------
+// 🧩 Utility Types
+// -----------------------------------------------------------------------------
+interface ParticipationStats {
+  repo_id: number;
+  week_start: Date;
+  all_commits: number;
+  owner_commits: number;
+}
+
+// -----------------------------------------------------------------------------
+// 🔹 GET: Fetch participation stats from DB
+// -----------------------------------------------------------------------------
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const repoUrl = searchParams.get("repoUrl");
-
-  if (!repoUrl || !repoUrl.includes("/")) {
-    return NextResponse.json(
-      { error: "Valid repoUrl is required (owner/repo)" },
-      { status: 400 }
-    );
-  }
-
-  const [owner, name] = repoUrl.split("/");
-
   try {
+    const { searchParams } = new URL(request.url);
+    const repoUrl = searchParams.get("repoUrl");
+
+    if (!repoUrl || !repoUrl.includes("/")) {
+      return NextResponse.json(
+        { error: "Valid repoUrl is required (format: owner/repo)" },
+        { status: 400 }
+      );
+    }
+
+    const [owner, name] = repoUrl.split("/");
+
+    // 🗃 Find repo
     const repo = await prisma.repo.findUnique({
       where: { owner_name: { owner, name } },
     });
 
     if (!repo) {
-      return NextResponse.json({ error: "Repo not found in DB" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Repo not found in DB" },
+        { status: 404 }
+      );
     }
 
-    const stats = await prisma.participationStats.findMany({
+    // 📊 Fetch weekly participation stats
+    const rawStats = await prisma.participationStats.findMany({
       where: { repo_id: repo.id },
-      orderBy: { week_start: "asc" }, // oldest first
+      orderBy: { week_start: "asc" },
     });
 
-    return NextResponse.json(stats);
-  } catch (error) {
-    console.error(error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    // Convert BigInt fields to numbers to match ParticipationStats interface
+    const stats: ParticipationStats[] = rawStats.map((r) => ({
+      repo_id: Number(r.repo_id),
+      week_start: r.week_start,
+      all_commits: Number(r.all_commits),
+      owner_commits: Number(r.owner_commits),
+    }));
+
+    if (!stats.length) {
+      return NextResponse.json(
+        {
+          message:
+            "No participation stats found. Try POST to fetch fresh data.",
+        },
+        { status: 404 }
+      );
+    }
+
+    // 🧮 Compute summary
+    const totalAllCommits = stats.reduce(
+      (sum, s) => sum + Number(s.all_commits),
+      0
+    );
+    const totalOwnerCommits = stats.reduce(
+      (sum, s) => sum + Number(s.owner_commits),
+      0
+    );
+
+    return NextResponse.json({
+      totalWeeks: stats.length,
+      totalAllCommits,
+      totalOwnerCommits,
+      weeklyStats: stats,
+    });
+  } catch (error: unknown) {
+    console.error("❌ Error fetching participation stats:", error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Internal Server Error" },
+      { status: 500 }
+    );
   }
 }
 
-// ------------------- POST: fetch participation stats from GitHub & save to DB -------------------
+// -----------------------------------------------------------------------------
+// 🔹 POST: Fetch participation stats from GitHub & save to DB
+// -----------------------------------------------------------------------------
 export async function POST(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const repoUrl = searchParams.get("repoUrl");
-
-  if (!repoUrl || !repoUrl.includes("/")) {
-    return NextResponse.json(
-      { error: "Valid repoUrl is required (owner/repo)" },
-      { status: 400 }
-    );
-  }
-
-  const githubAccessToken = process.env.GITHUB_ACCESS_TOKEN;
-  if (!githubAccessToken) {
-    return NextResponse.json({ error: "GitHub token not configured" }, { status: 500 });
-  }
-
-  const [owner, name] = repoUrl.split("/");
-
   try {
-    // Get repo
+    const { searchParams } = new URL(request.url);
+    const repoUrl = searchParams.get("repoUrl");
+
+    if (!repoUrl || !repoUrl.includes("/")) {
+      return NextResponse.json(
+        { error: "Valid repoUrl is required (format: owner/repo)" },
+        { status: 400 }
+      );
+    }
+
+    const githubAccessToken = process.env.GITHUB_ACCESS_TOKEN;
+    if (!githubAccessToken) {
+      return NextResponse.json(
+        { error: "GitHub token not configured" },
+        { status: 500 }
+      );
+    }
+
+    const [owner, name] = repoUrl.split("/");
+
+    // 🗃 Ensure repo exists
     const repo = await prisma.repo.findUnique({
       where: { owner_name: { owner, name } },
     });
 
     if (!repo) {
-      return NextResponse.json({ error: "Repo not found in DB" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Repo not found in DB" },
+        { status: 404 }
+      );
     }
 
-    // Fetch participation stats from GitHub
-    const response = await fetch(`https://api.github.com/repos/${owner}/${name}/stats/participation`, {
-      headers: {
-        Accept: "application/vnd.github+json",
-        Authorization: `Bearer ${githubAccessToken}`,
-      },
-    });
+    // 🌐 Fetch participation stats from GitHub
+    const response = await fetch(
+      `https://api.github.com/repos/${owner}/${name}/stats/participation`,
+      {
+        headers: {
+          Accept: "application/vnd.github+json",
+          Authorization: `Bearer ${githubAccessToken}`,
+        },
+      }
+    );
 
     if (response.status === 202) {
       return NextResponse.json(
-        { message: "Participation stats are being generated, try again shortly." },
+        {
+          message:
+            "Participation stats are being generated by GitHub. Please try again shortly.",
+        },
         { status: 202 }
       );
     }
 
     if (!response.ok) {
-      return NextResponse.json({ error: "GitHub API error", status: response.status });
+      return NextResponse.json(
+        { error: "GitHub API error fetching participation data" },
+        { status: response.status }
+      );
     }
 
-    const data = await response.json(); 
-    // data = { all: [week0, week1, ...], owner: [week0, week1, ...] }
+    const data: unknown = await response.json();
 
-    const allCommits = data.all || [];
-    const ownerCommits = data.owner || [];
+    // 🧩 Validate structure safely
+    if (
+      typeof data !== "object" ||
+      data === null ||
+      !("all" in data) ||
+      !("owner" in data)
+    ) {
+      return NextResponse.json(
+        { error: "Unexpected response format from GitHub API" },
+        { status: 500 }
+      );
+    }
+
+    const allCommits = Array.isArray((data as any).all)
+      ? (data as any).all
+      : [];
+    const ownerCommits = Array.isArray((data as any).owner)
+      ? (data as any).owner
+      : [];
 
     const now = new Date();
     const startYear = new Date(now.getFullYear(), 0, 1); // Jan 1st of current year
 
-    // Upsert weekly participation stats
-    for (let i = 0; i < allCommits.length; i++) {
+    // 🪄 Upsert each week's participation data
+    const upsertOps = allCommits.map(async (commits: number, i: number) => {
       const weekStart = new Date(startYear);
       weekStart.setDate(startYear.getDate() + i * 7);
 
-      await prisma.participationStats.upsert({
-        where: { repo_id_week_start: { repo_id: repo.id, week_start: weekStart } },
+      return prisma.participationStats.upsert({
+        where: {
+          repo_id_week_start: {
+            repo_id: repo.id,
+            week_start: weekStart,
+          },
+        },
         update: {
-          all_commits: allCommits[i],
+          all_commits: commits,
           owner_commits: ownerCommits[i] || 0,
         },
         create: {
           repo_id: repo.id,
           week_start: weekStart,
-          all_commits: allCommits[i],
+          all_commits: commits,
           owner_commits: ownerCommits[i] || 0,
         },
       });
-    }
+    });
 
-    return NextResponse.json({ message: "Participation stats saved successfully" });
-  } catch (error) {
-    console.error(error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    await Promise.all(upsertOps);
+
+    return NextResponse.json({
+      message: "Participation stats saved successfully",
+      totalWeeks: allCommits.length,
+    });
+  } catch (error: unknown) {
+    console.error("❌ Error saving participation stats:", error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Internal Server Error" },
+      { status: 500 }
+    );
   }
 }

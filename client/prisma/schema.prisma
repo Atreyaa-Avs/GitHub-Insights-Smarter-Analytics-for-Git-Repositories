@@ -8,55 +8,190 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// -----------------------------------------------------------------------------
+// 🔹 Repo Table — Core Repository Metadata
+// -----------------------------------------------------------------------------
 model Repo {
-  id               BigInt    @id @default(autoincrement())
-  owner            String
-  name             String
-  description      String?
-  visibility       String?
-  default_branch   String?
-  created_at       DateTime?
-  updated_at       DateTime?
-  pushed_at        DateTime?
-  avatar_url       String?
-  html_url         String?
+  id                BigInt    @id @default(autoincrement())
+  owner             String
+  name              String
+  description       String?
+  visibility        String?
+  default_branch    String?
+  created_at        DateTime?
+  updated_at        DateTime?
+  pushed_at         DateTime?
+  avatar_url        String?
+  html_url          String?
 
   // Overview counters used by the page
-  stargazers_count Int       @default(0)
-  watchers_count   Int       @default(0)          // GitHub legacy watchers (equals stars for REST v3)
-  subscribers_count Int      @default(0)          // “Watchers” (subscribers) used by UI fallback
-  forks_count      Int       @default(0)
-  branch_count     Int       @default(0)          // precomputed in ingestion
-  tag_count        Int       @default(0)          // precomputed in ingestion
-  open_prs_count   Int       @default(0)
-  open_issues_count Int      @default(0)
-  size_kb          Int       @default(0)          // GitHub repo.size returns KB; UI divides by 1024
-  language         String?                           // main language
-  license_name     String?                           // license?.name
-  homepage         String?
-  topics           String[]  @default([])           // used by the chips
-  last_commit      DateTime?                         // latest commit timestamp
+  stargazers_count  Int       @default(0)
+  watchers_count    Int       @default(0)
+  subscribers_count Int       @default(0)
+  forks_count       Int       @default(0)
+  branch_count      Int       @default(0)
+  tag_count         Int       @default(0)
+  open_prs_count    Int       @default(0)
+  open_issues_count Int       @default(0)
+  size_kb           Int       @default(0)
+  language          String?
+  license_name      String?
+  homepage          String?
+  topics            String[]  @default([])
+  last_commit       DateTime?
 
   // Relations
-  commits          Commit[]
+  commits            Commit[]
+  contributorRanks   ContributorRank[]
+  issues             Issue[]
+  languages          RepoLanguage[]
+  participationStats ParticipationStats[]
+  pulls              Pull[]
+  releases           Release[]
+  weeklyCommits      WeeklyCommit[]     // ✅ <-- add this line
 
   @@unique([owner, name], map: "owner_name")
   @@index([updated_at])
   @@index([pushed_at])
 }
 
+// -----------------------------------------------------------------------------
+// 🔹 Commit Table
+// -----------------------------------------------------------------------------
 model Commit {
-  id           BigInt    @id @default(autoincrement())
-  sha          String    @unique
-  message      String?
-  committed_at DateTime?
-  repo_id      BigInt
-  repo         Repo      @relation(fields: [repo_id], references: [id])
-
-  author_login    String? 
+  id              BigInt   @id @default(autoincrement())
+  sha             String   @unique
+  message         String?
+  committed_at    DateTime?
+  repo_id         BigInt
+  repo            Repo     @relation(fields: [repo_id], references: [id])
+  author_login    String?
   committer_login String?
-
-  updated_at DateTime @default(now()) @updatedAt
+  updated_at      DateTime @default(now()) @updatedAt
 
   @@index([repo_id, committed_at])
+}
+
+// -----------------------------------------------------------------------------
+// 🔹 GitHub User
+// -----------------------------------------------------------------------------
+model GhUser {
+  login       String  @id
+  avatar_url  String?
+  type        String?
+  // Relations
+  contributorRanks ContributorRank[]
+}
+
+// -----------------------------------------------------------------------------
+// 🔹 Contributor Rank (linking Repo ↔ User)
+// -----------------------------------------------------------------------------
+model ContributorRank {
+  id            BigInt  @id @default(autoincrement())
+  repo_id       BigInt
+  user_login    String
+  contributions Int      @default(0)
+
+  // Relations
+  repo Repo   @relation(fields: [repo_id], references: [id])
+  user GhUser @relation(fields: [user_login], references: [login])
+
+  @@unique([repo_id, user_login], map: "repo_id_user_login")
+  @@index([repo_id])
+  @@index([contributions])
+}
+
+// -----------------------------------------------------------------------------
+// 🔹 Issue Table
+// -----------------------------------------------------------------------------
+model Issue {
+  id            BigInt   @id @default(autoincrement())
+  repo_id       BigInt
+  issue_number  Int
+  title         String
+  state         String
+  created_at    DateTime
+  updated_at    DateTime
+  closed_at     DateTime?
+  author_login  String?
+
+  repo Repo @relation(fields: [repo_id], references: [id])
+
+  @@unique([repo_id, issue_number], map: "repo_id_issue_number")
+  @@index([repo_id, created_at])
+}
+
+// -----------------------------------------------------------------------------
+// 🔹 Repo Language Table (NEW for get-languages route)
+// -----------------------------------------------------------------------------
+model RepoLanguage {
+  id             BigInt   @id @default(autoincrement())
+  repo_id        BigInt
+  language       String
+  bytes_of_code  BigInt
+
+  repo Repo @relation(fields: [repo_id], references: [id])
+
+  @@unique([repo_id, language], map: "repo_id_language")
+  @@index([repo_id])
+  @@index([bytes_of_code])
+}
+
+// -----------------------------------------------------------------------------
+// 📊 Participation Stats Model
+// -----------------------------------------------------------------------------
+model ParticipationStats {
+  id             BigInt   @id @default(autoincrement())
+  repo_id        BigInt
+  week_start     DateTime
+  all_commits    Int      @default(0)
+  owner_commits  Int      @default(0)
+
+  repo Repo @relation(fields: [repo_id], references: [id], onDelete: Cascade)
+
+  @@unique([repo_id, week_start], map: "repo_id_week_start")
+  @@index([repo_id])
+}
+
+model Pull {
+  id            BigInt   @id @default(autoincrement())
+  repo_id       BigInt
+  pr_number     Int
+  title         String
+  state         String
+  created_at    DateTime
+  updated_at    DateTime
+  closed_at     DateTime?
+  merged_at     DateTime?
+  author_login  String?
+
+  repo Repo @relation(fields: [repo_id], references: [id], onDelete: Cascade)
+
+  @@unique([repo_id, pr_number], map: "repo_id_pr_number")
+  @@index([repo_id, created_at])
+}
+model Release {
+  id           Int       @id @default(autoincrement())
+  release_id   BigInt    @unique // GitHub’s release ID
+  repo_id      BigInt
+  tag_name     String?
+  name         String?
+  html_url     String?
+  created_at   DateTime?
+  published_at DateTime?
+
+  repo Repo @relation(fields: [repo_id], references: [id])
+}
+
+model WeeklyCommit {
+  id       String   @id @default(cuid())
+  repo_id  BigInt
+  week     DateTime
+  total    Int
+
+  // Relation to Repo (with cascade delete for consistency)
+  repo     Repo     @relation(fields: [repo_id], references: [id], onDelete: Cascade)
+
+  @@unique([repo_id, week], name: "repo_id_week")
+  @@index([repo_id])
 }

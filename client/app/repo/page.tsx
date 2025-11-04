@@ -11,6 +11,13 @@ import Link from "next/link";
 import Repo from "./Repo";
 import { AnimatedThemeToggler } from "@/components/magicui/animated-theme-toggler";
 import Commits from "./Commits";
+import Contributors from "./Contributors";
+import Issues from "./Issues";
+import PullRequests from "./PullRequests";
+import Releases from "./Releases";
+import TopCommitters from "./TopCommits";
+import WeeklyCommits from "./WeeklyCommits";
+import { Card } from "@/components/ui/card";
 
 // Simple fetch for repo GET → POST fallback
 const fetchRepo = async (repoUrl: string) => {
@@ -126,9 +133,55 @@ const Page = () => {
         {/* Repository Overview */}
         <Repo />
         {/* Recent Commits */}
-        <div className="col-span-2">
+        <div className="col-span-2 ml-4">
           <Commits />
         </div>
+        <div className="col-span-3 my-4">
+          <Card>
+            <WeeklyCommits />
+          </Card>
+        </div>
+        <div className="col-span-3 mt-12">
+          <Card>
+            <Contributors />
+          </Card>
+        </div>
+        <div className="grid grid-cols-2 col-span-3">
+          <div className="mt-12 mr-4">
+            <Card>
+              <Issues />
+            </Card>
+          </div>
+          <div className="mt-12 mr-4">
+            <Card>
+              <PullRequests />
+            </Card>
+          </div>
+        </div>
+        <div className="mt-12 col-span-3">
+          <Card>
+            <Releases />
+          </Card>
+        </div>
+        {/* <TopCommitters /> */}
+      </div>
+      <div className="flex justify-between items-center bg-gradient-to-r from-purple-700 to-zinc-700 shadow-2xl mx-20 my-4 rounded-xl px-4">
+        <Image
+          src="/logo.svg"
+          alt="Gitlytics"
+          width={1550}
+          height={1550}
+          className="w-full h-auto max-w-[250px]"
+        />
+        <p className="text-center ml-48 bg-white shadow-md py-3 px-8 text-xl rounded-xl">
+          Github Pipeline Dashboard for FDE Project
+        </p>
+        <Image
+          src={"/photos/footerPhoto1.png"}
+          width={520}
+          height={500}
+          alt="FooterPhoto"
+        />
       </div>
     </div>
   );

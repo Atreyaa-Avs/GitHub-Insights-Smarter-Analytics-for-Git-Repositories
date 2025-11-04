@@ -4,7 +4,14 @@ import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSearchParams } from "next/navigation";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
 interface Commit {
   sha: string;
@@ -57,7 +64,7 @@ const Commits = () => {
   const decodedRepo = decodeURIComponent(repoUrl);
 
   const [page, setPage] = useState(1);
-  const commitsPerPage = 10;
+  const commitsPerPage = 7;
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["commits", decodedRepo],
@@ -68,6 +75,7 @@ const Commits = () => {
   const totalPages = data
     ? Math.ceil(data.recentCommits.length / commitsPerPage)
     : 0;
+
   const paginatedCommits = data
     ? data.recentCommits.slice(
         (page - 1) * commitsPerPage,
@@ -75,15 +83,12 @@ const Commits = () => {
       )
     : [];
 
-  const handlePrev = () => setPage((prev) => Math.max(prev - 1, 1));
-  const handleNext = () => setPage((prev) => Math.min(prev + 1, totalPages));
-
   return (
     <div className="flex flex-col bg-white dark:bg-black p-4 rounded-2xl shadow-acternity size-full mt-3">
-      <h2 className="text-xl font-bold mb-2">Commit History</h2>
+      <h2 className="text-2xl font-bold mt-3 mb-4">Commit History</h2>
 
       {isLoading ? (
-        <div className="space-y-2">
+        <div className="space-y-2 h-full">
           {Array.from({ length: 5 }).map((_, idx) => (
             <Skeleton key={idx} className="h-6 w-full" />
           ))}
@@ -92,50 +97,61 @@ const Commits = () => {
         <p className="text-red-500">{(error as Error)?.message}</p>
       ) : (
         <>
-          <p>Total Commits: {formatIndianNumber(data?.totalCommits || 0)}</p>
-          <ul className="mt-4 space-y-2">
-            {paginatedCommits.map((commit: Commit) => (
-              <li
-                key={commit.sha}
-                className="border-b border-gray-200 pb-2 dark:border-gray-700"
-              >
-                <p className="font-semibold mb-2">
-                  {commit.message
-                    ? commit.message.split(" ").slice(0, 20).join(" ") +
-                      (commit.message.split(" ").length > 20 ? "..." : "")
-                    : "No message"}
-                </p>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  {commit.author?.name || "Unknown"} →{" "}
-                  {commit.committer?.name || "Unknown"} on{" "}
-                  {commit.committed_at
-                    ? new Date(commit.committed_at).toLocaleDateString()
-                    : "Unknown"}
-                </p>
-              </li>
-            ))}
-          </ul>
+          <div className="h-full">
+            <p className="mt-4 text-xl"><span className="font-bold text-lg">Total Commits:</span> <span className="bg-orange-500 py-1 px-4 rounded-xl text-white">{formatIndianNumber(data?.totalCommits || 0)}</span></p>
+            <ul className="mt-4 space-y-2">
+              {paginatedCommits.map((commit: Commit) => (
+                <li
+                  key={commit.sha}
+                  className="border-b border-gray-200 pb-2 dark:border-gray-700"
+                >
+                  <p className="font-semibold mb-2">
+                    {commit.message
+                      ? commit.message.split(" ").slice(0, 20).join(" ") +
+                        (commit.message.split(" ").length > 20 ? "..." : "")
+                      : "No message"}
+                  </p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    {commit.author?.name || "Unknown"} →{" "}
+                    {commit.committer?.name || "Unknown"} on{" "}
+                    {commit.committed_at
+                      ? new Date(commit.committed_at).toLocaleDateString()
+                      : "Unknown"}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </div>
 
-          {/* Pagination Controls */}
+          {/* ---------------- Full-Width Pagination ---------------- */}
           {totalPages > 1 && (
-            <div className="flex justify-between items-center mt-4">
-              <button
-                onClick={handlePrev}
-                disabled={page === 1}
-                className="flex items-center gap-1 px-3 py-1 rounded-lg bg-gray-200 dark:bg-gray-700 disabled:opacity-50"
-              >
-                <ChevronLeft size={16} /> Prev
-              </button>
-              <span>
-                Page {page} of {totalPages}
-              </span>
-              <button
-                onClick={handleNext}
-                disabled={page === totalPages}
-                className="flex items-center gap-1 px-3 py-1 rounded-lg bg-gray-200 dark:bg-gray-700 disabled:opacity-50"
-              >
-                Next <ChevronRight size={16} />
-              </button>
+            <div className="w-full mt-6">
+              <Pagination className="w-full flex justify-center">
+                <PaginationContent className="flex flex-wrap justify-center">
+                  <PaginationItem>
+                    <PaginationPrevious
+                      onClick={() => setPage((p) => Math.max(p - 1, 1))}
+                      className={`${page === 1 ? "pointer-events-none opacity-50" : ""} cursor-pointer`}
+                    />
+                  </PaginationItem>
+                  {Array.from({ length: totalPages }).map((_, idx) => (
+                    <PaginationItem key={idx}>
+                      <PaginationLink
+                        onClick={() => setPage(idx + 1)}
+                        isActive={page === idx + 1}
+                      >
+                        {idx + 1}
+                      </PaginationLink>
+                    </PaginationItem>
+                  ))}
+                  <PaginationItem>
+                    <PaginationNext
+                      onClick={() => setPage((p) => Math.min(p + 1, totalPages))}
+                      className={`${page === totalPages ? "pointer-events-none opacity-50" : ""} cursor-pointer`}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
             </div>
           )}
         </>
@@ -146,7 +162,6 @@ const Commits = () => {
 
 export default Commits;
 
-
 function formatIndianNumber(num: number | string): string {
-  return new Intl.NumberFormat('en-IN').format(Number(num));
+  return new Intl.NumberFormat("en-IN").format(Number(num));
 }

@@ -26,25 +26,16 @@ const Hero = () => {
       >
         <span className="">✨</span>
         <AnimatedShinyText className="font-bold text-xs md:text-sm">
-          Introducing FinSmart Template
+          Introducing Github Insights
         </AnimatedShinyText>
         <MoveRight size={15} className="text-black dark:text-white" />
       </Button>
       <h1 className="font-bold text-4xl md:text-5xl lg:text-6xl text-center leading-tight">
-        Your{" "}
-        <Highlighter action="circle" color="#FF9800">
-          Wealth
-        </Highlighter>
-        , decoded. <br />
-        Financial Analysis, made{" "}
-        <Highlighter action="underline" color="#FF9800">
-          simple
-        </Highlighter>
-        .
+        Your <Highlighter action="circle" color="#FF9800">repository</Highlighter> analytics, <br />
+        <Highlighter action="underline" color="#FF9800">decoded</Highlighter> for engineering teams.
       </h1>
       <h2 className="text-base sm:text-lg md:text-xl text-center max-w-sm sm:max-w-md md:max-w-2xl lg:max-w-3xl mx-auto pt-8 pb-6 font-medium">
-        Your finances, decoded — real-time insights and an AI assistant built on
-        Fi's MCP server.
+        Instantly visualize code activity, team participation, and delivery trends. Actionable insights from your GitHub pipeline—no more guesswork, just clarity.
       </h2>
 
       <CTA />
@@ -63,9 +54,9 @@ const HeroImage = () => {
       <BorderBeam duration={6} delay={3} size={400} borderWidth={2} />
 
       <Safari
-        url="https://finsmart.com/awesome"
+        url="https://gitlytics.com"
         className="size-full"
-        imageSrc="/Backgrounds/HeroImage_Bg.png"
+        imageSrc="/photos/problem2.png"
       />
     </div>
   );

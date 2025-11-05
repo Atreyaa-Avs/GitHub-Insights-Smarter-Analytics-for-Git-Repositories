@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
       await inngest.send({
         name: "repo/sync.commits",
         data: { owner, name },
-      });
+      }); 
       return NextResponse.json({
         status: "queued",
         message: `Commit sync started for ${owner}/${name}`,

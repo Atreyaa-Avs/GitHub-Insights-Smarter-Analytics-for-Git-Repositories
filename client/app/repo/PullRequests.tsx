@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { Skeleton } from "@/components/ui/skeleton";
+import React, { useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import {
   Pagination,
@@ -12,6 +13,13 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import {
+  Select,
+  SelectTrigger,
+  SelectContent,
+  SelectItem,
+  SelectValue,
+} from "@/components/ui/select";
 
 type PullRequest = {
   pr_number: number;
@@ -24,59 +32,63 @@ type PullRequest = {
   merged_at: string | null;
 };
 
+// ---------------- Fetcher ----------------
+async function fetchPullRequests(repoUrl: string, page: number, limit: number) {
+  const res = await fetch(
+    `/api/get-pulls?repoUrl=${encodeURIComponent(
+      repoUrl
+    )}&page=${page}&limit=${limit}`
+  );
+
+  const data = await res.json();
+
+  if (!res.ok) throw new Error(data.error || "Failed to fetch pull requests");
+
+  return {
+    pulls: (data.pulls || []).map((p: any) => ({
+      pr_number: p.pr_number ?? 0,
+      title: p.title || "Untitled PR",
+      state: p.state || "open",
+      author_login: p.author_login || "Unknown",
+      created_at: p.created_at || new Date().toISOString(),
+      updated_at: p.updated_at || new Date().toISOString(),
+      closed_at: p.closed_at ?? null,
+      merged_at: p.merged_at ?? null,
+    })),
+    totalCount: data.totalCount ?? data.pulls?.length ?? 0,
+  };
+}
+
 export default function PullRequests() {
   const searchParams = useSearchParams();
   const repoUrl = searchParams.get("repoUrl");
 
-  const [loading, setLoading] = useState(true);
-  const [pulls, setPulls] = useState<PullRequest[]>([]);
-  const [totalCount, setTotalCount] = useState<number>(0);
-  const [error, setError] = useState<string | null>(null);
+  // 👇 User-controllable number of PRs per page
+  const [prsPerPage, setPrsPerPage] = useState(5);
   const [currentPage, setCurrentPage] = useState(1);
-  const prsPerPage = 5;
 
-  useEffect(() => {
-    if (!repoUrl) return;
+  // ---------------- React Query ----------------
+  const { data, isLoading, isError, error } = useQuery({
+    queryKey: ["pulls", repoUrl, currentPage, prsPerPage],
+    queryFn: () => fetchPullRequests(repoUrl!, currentPage, prsPerPage),
+    enabled: !!repoUrl,
+  });
 
-    async function fetchPRs() {
-      try {
-        setLoading(true);
-        const res = await fetch(`/api/get-pulls?repoUrl=${repoUrl}`);
-        const data = await res.json();
-
-        if (!res.ok) throw new Error(data.error || "Failed to fetch pull requests");
-
-        setPulls(data.pulls || []);
-        setTotalCount(data.totalCount || 0);
-      } catch (err: any) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchPRs();
-  }, [repoUrl]);
-
-  // ---------------- Pagination Logic ----------------
-  const totalPages = Math.ceil(pulls.length / prsPerPage);
-  const startIndex = (currentPage - 1) * prsPerPage;
-  const currentPRs = pulls.slice(startIndex, startIndex + prsPerPage);
+  const pulls: PullRequest[] = data?.pulls || [];
+  const totalCount: number = data?.totalCount || 0;
+  const totalPages = Math.ceil(totalCount / prsPerPage);
 
   const handlePageChange = (page: number) => {
-    if (page >= 1 && page <= totalPages) {
-      setCurrentPage(page);
-      // removed scrollTo for smoother UX
-    }
+    if (page >= 1 && page <= totalPages) setCurrentPage(page);
   };
 
   // ---------------------- Skeleton Loading ----------------------
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="p-6">
         <Skeleton className="h-6 w-40 mb-4" />
         <div className="space-y-4">
-          {Array.from({ length: 5 }).map((_, i) => (
+          {Array.from({ length: prsPerPage }).map((_, i) => (
             <div
               key={i}
               className="border rounded-2xl p-4 shadow-sm flex flex-col gap-3"
@@ -94,10 +106,10 @@ export default function PullRequests() {
   }
 
   // ---------------------- Error UI ----------------------
-  if (error) {
+  if (isError) {
     return (
       <div className="p-6 text-red-500">
-        ⚠️ Error loading pull requests: {error}
+        ⚠️ Error loading pull requests: {(error as Error).message}
       </div>
     );
   }
@@ -114,12 +126,37 @@ export default function PullRequests() {
   // ---------------------- Pull Requests List ----------------------
   return (
     <div className="px-6">
-      <h2 className="text-xl font-semibold mb-6">
-        Latest Pull Requests ({totalCount})
-      </h2>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-xl font-semibold">
+          Latest Pull Requests ({totalCount})
+        </h2>
 
-      <div className="space-y-4">
-        {currentPRs.map((pr) => (
+        {/* 👇 Per-page selector */}
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <span>Show per page:</span>
+          <Select
+            value={prsPerPage.toString()}
+            onValueChange={(v) => {
+              setPrsPerPage(Number(v));
+              setCurrentPage(1); // reset to page 1
+            }}
+          >
+            <SelectTrigger className="w-[80px]">
+              <SelectValue placeholder="5" />
+            </SelectTrigger>
+            <SelectContent>
+              {[5, 10, 20, 50].map((num) => (
+                <SelectItem key={num} value={num.toString()}>
+                  {num}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <div className="space-y-8">
+        {pulls.map((pr) => (
           <div
             key={pr.pr_number}
             className="border rounded-2xl p-4 shadow-sm hover:shadow-md transition-all"
@@ -152,7 +189,9 @@ export default function PullRequests() {
                     : "Closed"}
                 </Badge>
                 <span>by {pr.author_login || "Unknown"}</span>
-                <span>• opened {new Date(pr.created_at).toLocaleDateString()}</span>
+                <span>
+                  • opened {new Date(pr.created_at).toLocaleDateString()}
+                </span>
               </div>
             </div>
           </div>
@@ -168,7 +207,7 @@ export default function PullRequests() {
                 <PaginationPrevious
                   onClick={() => handlePageChange(currentPage - 1)}
                   className={
-                    currentPage === 1 ? "pointer-events-none opacity-50" : ""
+                    `${currentPage === 1 ? "pointer-events-none opacity-50" : ""} cursor-pointer`
                   }
                 />
               </PaginationItem>
@@ -188,9 +227,9 @@ export default function PullRequests() {
                 <PaginationNext
                   onClick={() => handlePageChange(currentPage + 1)}
                   className={
-                    currentPage === totalPages
+                    `${currentPage === totalPages
                       ? "pointer-events-none opacity-50"
-                      : ""
+                      : ""} cursor-pointer`
                   }
                 />
               </PaginationItem>

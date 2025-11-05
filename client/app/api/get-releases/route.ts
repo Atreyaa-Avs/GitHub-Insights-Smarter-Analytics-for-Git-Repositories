@@ -2,7 +2,7 @@ import { prisma } from "@/utils/prisma";
 import { inngest } from "@/inngest/client";
 import { NextRequest, NextResponse } from "next/server";
 
-// Utility to safely serialize BigInt fields
+// Utility: safely handle BigInt in JSON responses
 function safeJson(data: any) {
   return JSON.parse(
     JSON.stringify(data, (_, value) =>
@@ -12,64 +12,62 @@ function safeJson(data: any) {
 }
 
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const repoUrl = searchParams.get("repoUrl");
-
-  if (!repoUrl || !repoUrl.includes("/")) {
-    return NextResponse.json(
-      { error: "Valid repoUrl is required (format: owner/repo)" },
-      { status: 400 }
-    );
-  }
-
-  const [owner, name] = repoUrl.split("/");
-
   try {
-    // 1️⃣ Check if repo exists
-    const repo = await prisma.repo.findUnique({
-      where: { owner_name: { owner, name } },
-    });
+    const { searchParams } = new URL(request.url);
+    const repoUrl = searchParams.get("repoUrl");
 
-    if (!repo) {
-      await inngest.send({
-        name: "repo/sync.releases",
-        data: { owner, name },
-      });
-      return NextResponse.json({
-        status: "queued",
-        message: `Release sync started for ${owner}/${name} as repo was missing`,
-      });
+    if (!repoUrl || !repoUrl.includes("/")) {
+      return NextResponse.json(
+        { error: "Valid repoUrl is required (format: owner/repo)" },
+        { status: 400 }
+      );
     }
 
-    // 2️⃣ Fetch releases from DB
+    const [owner, name] = repoUrl.split("/");
+
+    // 1️⃣ Ensure the repo exists (create if missing)
+    const repo = await prisma.repo.upsert({
+      where: { owner_name: { owner, name } },
+      update: {},
+      create: { owner, name },
+    });
+
+    const repoId = BigInt(repo.id);
+
+    // 2️⃣ Try to fetch releases from DB
     const releases = await prisma.release.findMany({
-      where: { repo_id: repo.id },
+      where: { repo_id: repoId },
       orderBy: { published_at: "desc" },
       take: 50,
     });
 
-    // Trigger Inngest if no releases found
+    // 3️⃣ If no releases found, trigger Inngest sync
     if (!releases.length) {
       await inngest.send({
         name: "repo/sync.releases",
         data: { owner, name },
       });
+
       return NextResponse.json({
         status: "queued",
         message: `Release sync started for ${owner}/${name} as no releases were found`,
       });
     }
 
-    const totalCount = await prisma.release.count({ where: { repo_id: repo.id } });
+    // 4️⃣ Count total releases
+    const totalCount = await prisma.release.count({ where: { repo_id: repoId } });
 
+    // 5️⃣ Return the data
     return NextResponse.json({
+      status: "ok",
+      repoId: repoId.toString(),
       totalCount,
       latestCount: releases.length,
       releases: safeJson(releases),
       source: "Database",
     });
   } catch (error) {
-    console.error("❌ GET /releases error:", error);
+    console.error("❌ Unified GET /releases error:", error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Internal Server Error" },
       { status: 500 }

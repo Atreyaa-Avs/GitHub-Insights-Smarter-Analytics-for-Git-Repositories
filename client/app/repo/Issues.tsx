@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { Skeleton } from "@/components/ui/skeleton";
+import React, { useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import {
   Pagination,
@@ -13,6 +14,7 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 
+// ------------------- Types -------------------
 type Issue = {
   number: number;
   title: string;
@@ -23,52 +25,64 @@ type Issue = {
   author: { login: string };
 };
 
+interface IssuesApiResponse {
+  issues: Issue[];
+  totalCount: number;
+}
+
+// ------------------- Fetch Function -------------------
+const fetchIssues = async (repoUrl: string): Promise<IssuesApiResponse> => {
+  const res = await fetch(`/api/get-issues?repoUrl=${encodeURIComponent(repoUrl)}`);
+  const data = await res.json();
+
+  if (!res.ok) throw new Error(data.error || "Failed to fetch issues");
+
+  return {
+    issues: (data.issues || []).map((i: any) => ({
+      number: i.number ?? 0,
+      title: i.title || "Untitled Issue",
+      state: i.state || "open",
+      created_at: i.created_at || new Date().toISOString(),
+      updated_at: i.updated_at || new Date().toISOString(),
+      closed_at: i.closed_at ?? null,
+      author: { login: i.author?.login || "Unknown" },
+    })),
+    totalCount: data.totalCount ?? data.issues?.length ?? 0,
+  };
+};
+
+// ------------------- Component -------------------
 export default function Issues() {
   const searchParams = useSearchParams();
-  const repoUrl = searchParams.get("repoUrl");
+  const repoUrl = searchParams.get("repoUrl") || "";
+  const decodedRepo = decodeURIComponent(repoUrl);
 
-  const [loading, setLoading] = useState(true);
-  const [issues, setIssues] = useState<Issue[]>([]);
-  const [totalCount, setTotalCount] = useState<number>(0);
-  const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const issuesPerPage = 5;
 
-  useEffect(() => {
-    if (!repoUrl) return;
+  // ------------------- React Query -------------------
+  const { data, isLoading, isError, error } = useQuery({
+    queryKey: ["issues", decodedRepo],
+    queryFn: () => fetchIssues(decodedRepo),
+    enabled: !!decodedRepo,
+  });
 
-    async function fetchIssues() {
-      try {
-        setLoading(true);
-        const res = await fetch(`/api/get-issues?repoUrl=${repoUrl}`);
-        const data = await res.json();
+  const issues = data?.issues || [];
+  const totalCount = data?.totalCount || 0;
 
-        if (!res.ok) throw new Error(data.error || "Failed to fetch issues");
-
-        setIssues(data.issues || []);
-        setTotalCount(data.totalCount || 0);
-      } catch (err: any) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchIssues();
-  }, [repoUrl]);
-
+  // ------------------- Pagination -------------------
   const totalPages = Math.ceil(issues.length / issuesPerPage);
-  const startIndex = (currentPage - 1) * issuesPerPage;
-  const currentIssues = issues.slice(startIndex, startIndex + issuesPerPage);
+  const currentIssues = issues.slice(
+    (currentPage - 1) * issuesPerPage,
+    currentPage * issuesPerPage
+  );
 
   const handlePageChange = (page: number) => {
-    if (page >= 1 && page <= totalPages) {
-      setCurrentPage(page);
-    }
+    if (page >= 1 && page <= totalPages) setCurrentPage(page);
   };
 
-  // ---------------------- Skeleton Loading ----------------------
-  if (loading) {
+  // ------------------- Loading UI -------------------
+  if (isLoading) {
     return (
       <div className="p-6">
         <Skeleton className="h-6 w-40 mb-4" />
@@ -90,16 +104,16 @@ export default function Issues() {
     );
   }
 
-  // ---------------------- Error UI ----------------------
-  if (error) {
+  // ------------------- Error UI -------------------
+  if (isError) {
     return (
       <div className="p-6 text-red-500">
-        ⚠️ Error loading issues: {error}
+        ⚠️ Error loading issues: {(error as Error)?.message}
       </div>
     );
   }
 
-  // ---------------------- Empty UI ----------------------
+  // ------------------- Empty State -------------------
   if (!issues.length) {
     return (
       <div className="p-6 text-muted-foreground">
@@ -108,7 +122,7 @@ export default function Issues() {
     );
   }
 
-  // ---------------------- Issues List ----------------------
+  // ------------------- Issues List -------------------
   return (
     <div className="px-6">
       <h2 className="text-xl font-semibold mb-6">
@@ -123,7 +137,7 @@ export default function Issues() {
           >
             <div className="flex flex-col gap-2">
               <a
-                href={`https://github.com/${repoUrl}/issues/${issue.number}`}
+                href={`https://github.com/${decodedRepo}/issues/${issue.number}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-foreground font-medium hover:underline"
@@ -138,7 +152,7 @@ export default function Issues() {
                 >
                   {issue.state}
                 </Badge>
-                <span>by {issue.author?.login || "Unknown"}</span>
+                <span>by {issue.author?.login}</span>
                 <span>• created {new Date(issue.created_at).toLocaleDateString()}</span>
               </div>
             </div>
@@ -146,7 +160,7 @@ export default function Issues() {
         ))}
       </div>
 
-      {/* ---------------- Pagination ---------------- */}
+      {/* ------------------- Pagination ------------------- */}
       {totalPages > 1 && (
         <div className="mt-6">
           <Pagination>
@@ -154,7 +168,9 @@ export default function Issues() {
               <PaginationItem>
                 <PaginationPrevious
                   onClick={() => handlePageChange(currentPage - 1)}
-                  className={`${currentPage === 1 ? "pointer-events-none opacity-50" : ""} cursor-pointer`}
+                  className={`${
+                    currentPage === 1 ? "pointer-events-none opacity-50" : ""
+                  } cursor-pointer`}
                 />
               </PaginationItem>
 
@@ -172,7 +188,11 @@ export default function Issues() {
               <PaginationItem>
                 <PaginationNext
                   onClick={() => handlePageChange(currentPage + 1)}
-                  className={`${currentPage === totalPages ? "pointer-events-none opacity-50" : ""} cursor-pointer`}
+                  className={`${
+                    currentPage === totalPages
+                      ? "pointer-events-none opacity-50"
+                      : ""
+                  } cursor-pointer`}
                 />
               </PaginationItem>
             </PaginationContent>

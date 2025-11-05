@@ -2,7 +2,7 @@ import { inngest } from "@/inngest/client";
 import { prisma } from "@/utils/prisma";
 import { NextRequest, NextResponse } from "next/server";
 
-// ---------------------- Normalize contributor for frontend ----------------
+// ---------------- Normalize contributor for frontend ----------------
 function normalizeContributor(c: any) {
   return {
     login: c.user?.login || c.login || "Unknown",
@@ -12,31 +12,29 @@ function normalizeContributor(c: any) {
   };
 }
 
-// ---------------------- Unified GET ----------------
+// ---------------- Main GET Handler ----------------
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const repoUrl = searchParams.get("repoUrl");
 
-  if (!repoUrl || !repoUrl.includes("/")) {
-    return NextResponse.json(
-      { error: "Valid repoUrl is required (owner/repo)" },
-      { status: 400 }
-    );
-  }
+  if (!repoUrl)
+    return NextResponse.json({ error: "repoUrl is required" }, { status: 400 });
 
   const [owner, name] = repoUrl.split("/");
+  if (!owner || !name)
+    return NextResponse.json({ error: "Invalid repoUrl format" }, { status: 400 });
 
   try {
-    // 1️⃣ Check repo in DB
+    // 1️⃣ Try fetching repo from DB
     const repo = await prisma.repo.findUnique({
       where: { owner_name: { owner, name } },
     });
 
-    // 2️⃣ If repo missing → trigger Inngest background sync
+    // If repo not found → trigger background sync
     if (!repo) {
-      console.log(`GET: Repo ${owner}/${name} not found, triggering sync...`);
+      console.log(`GET: Repo not found for ${owner}/${name}, triggering Inngest sync`);
       await inngest.send({
-        name: "repo/fetch.contributors",
+        name: "repo/sync.contributors",
         data: { owner, name },
       });
       return NextResponse.json({
@@ -45,21 +43,19 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // 3️⃣ Fetch contributors from DB
-    const contributorsRaw = await prisma.contributorRank.findMany({
+    // 2️⃣ Try fetching top contributors from DB
+    const contributorsFromDb = await prisma.contributorRank.findMany({
       where: { repo_id: repo.id },
       include: { user: true },
       orderBy: { contributions: "desc" },
       take: 50,
     });
 
-    // 4️⃣ If contributors empty → trigger Inngest background sync
-    if (!contributorsRaw.length) {
-      console.log(
-        `GET: No contributors found in DB for ${owner}/${name}, triggering sync...`
-      );
+    // If no contributors in DB → trigger background sync
+    if (!contributorsFromDb.length) {
+      console.log(`GET: No contributors found for ${owner}/${name}, triggering Inngest sync`);
       await inngest.send({
-        name: "repo/fetch.contributors",
+        name: "repo/sync.contributors",
         data: { owner, name },
       });
       return NextResponse.json({
@@ -68,11 +64,13 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // 5️⃣ Return normalized contributors
-    const topContributors = contributorsRaw.map(normalizeContributor);
+    // 3️⃣ Count total contributors
     const totalContributors = await prisma.contributorRank.count({
       where: { repo_id: repo.id },
     });
+
+    // 4️⃣ Return normalized contributors + total count
+    const topContributors = contributorsFromDb.map(normalizeContributor);
 
     return NextResponse.json({
       totalContributors,
@@ -81,9 +79,6 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("GET /get-contributors error:", error);
-    return NextResponse.json(
-      { error: "Internal Server Error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
-};
+}

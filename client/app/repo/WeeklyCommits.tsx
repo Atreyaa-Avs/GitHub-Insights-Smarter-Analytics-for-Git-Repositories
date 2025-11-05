@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -15,89 +16,73 @@ import {
   CartesianGrid,
 } from "recharts";
 
+// ------------------- Type Definitions -------------------
+interface WeeklyCommit {
+  week: string | Date;
+  total: number;
+}
+
+interface WeeklyCommitsApiResponse {
+  weeklyCommits: WeeklyCommit[];
+}
+
+// ------------------- API Fetch Function -------------------
+const fetchWeeklyCommits = async (repoUrl: string): Promise<WeeklyCommitsApiResponse> => {
+  const res = await fetch(`/api/get-weekly-commits?repoUrl=${encodeURIComponent(repoUrl)}`);
+  if (!res.ok) throw new Error("Failed to fetch weekly commits");
+
+  const data = await res.json();
+
+  return {
+    weeklyCommits: (data.weeklyCommits || data.cached || []).map((c: any) => ({
+      week: c.week ? new Date(c.week.replace(" ", "T")) : new Date(),
+      total: c.total ?? 0,
+    })),
+  };
+};
+
+// ------------------- WeeklyCommits Component -------------------
 export default function WeeklyCommits() {
   const searchParams = useSearchParams();
-  const repoUrl = searchParams.get("repoUrl");
+  const repoUrl = searchParams.get("repoUrl") || "";
+  const decodedRepo = decodeURIComponent(repoUrl);
 
-  const [loading, setLoading] = useState(true);
-  const [commits, setCommits] = useState<any[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  // ------------------- React Query -------------------
+  const {
+    data,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ["weeklyCommits", decodedRepo],
+    queryFn: () => fetchWeeklyCommits(decodedRepo),
+    enabled: !!decodedRepo,
+  });
 
-  // ------------------- GET weekly commits -------------------
-  const fetchWeeklyCommits = async () => {
-    if (!repoUrl) {
-      setError("No repoUrl provided in query params.");
-      setLoading(false);
-      return;
-    }
+  const weeklyCommits = data?.weeklyCommits || [];
 
-    try {
-      setLoading(true);
-      const res = await fetch(
-        `/api/get-weekly-commits?repoUrl=${encodeURIComponent(repoUrl)}`
-      );
-      const data = await res.json();
-      console.log(data);
-
-      if (!res.ok)
-        throw new Error(data.error || "Failed to fetch weekly commits.");
-
-      setCommits(data.weeklyCommits || data.cached || []);
-      setError(null);
-    } catch (err: any) {
-      console.error(err);
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // ------------------- POST to refresh weekly commits from GitHub -------------------
-  const syncWeeklyCommits = async () => {
-    if (!repoUrl) return;
-    try {
-      setLoading(true);
-      const res = await fetch(
-        `/api/get-weekly-commits?repoUrl=${encodeURIComponent(repoUrl)}`,
-        { method: "POST" }
-      );
-      const data = await res.json();
-      console.log("Sync response:", data);
-      await fetchWeeklyCommits();
-    } catch (err) {
-      console.error("Error syncing weekly commits:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchWeeklyCommits();
-  }, [repoUrl]);
+  // ------------------- POST Sync Function -------------------
+  // const syncWeeklyCommits = async () => {
+  //   if (!decodedRepo) return;
+  //   try {
+  //     await fetch(`/api/get-weekly-commits?repoUrl=${encodeURIComponent(decodedRepo)}`, {
+  //       method: "POST",
+  //     });
+  //     refetch(); // re-fetch after syncing
+  //   } catch (err) {
+  //     console.error("Error syncing weekly commits:", err);
+  //   }
+  // };
 
   // ------------------- Chart Data Formatting -------------------
-  const chartData = commits.map((item) => {
-    let date: Date;
-
-    // 🧠 Handle both string and Date from Prisma
-    if (item.week instanceof Date) {
-      date = item.week;
-    } else if (typeof item.week === "string") {
-      // Normalize to ISO (handles "YYYY-MM-DD HH:mm:ss")
-      date = new Date(item.week.replace(" ", "T"));
-    } else {
-      date = new Date(item.week);
-    }
-
-    const formatted =
-      !isNaN(date.getTime()) &&
-      date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-
-    return {
-      week: formatted || "N/A",
-      total: item.total ?? 0,
-    };
-  });
+  const chartData = weeklyCommits.map((item) => ({
+    week:
+      item.week instanceof Date
+        ? item.week.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+        : new Date(item.week).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+    total: item.total,
+  }));
 
   // ------------------- UI -------------------
   return (
@@ -106,18 +91,18 @@ export default function WeeklyCommits() {
         <h1 className="text-2xl font-bold">Weekly Commits</h1>
       </div>
 
-      {loading ? (
+      {isLoading ? (
         <Card className="p-6">
           <div className="space-y-4">
             <Skeleton className="h-6 w-1/3" />
             <Skeleton className="h-[300px] w-full" />
           </div>
         </Card>
-      ) : error ? (
+      ) : isError ? (
         <Card className="p-6">
-          <p className="text-red-500 text-center">{error}</p>
+          <p className="text-red-500 text-center">{(error as Error)?.message}</p>
         </Card>
-      ) : commits.length === 0 ? (
+      ) : weeklyCommits.length === 0 ? (
         <Card className="p-6">
           <p className="text-center text-gray-500">No commit data available.</p>
         </Card>
@@ -158,10 +143,10 @@ export default function WeeklyCommits() {
         </Card>
       )}
 
-      {!loading && commits.length > 0 && (
+      {!isLoading && weeklyCommits.length > 0 && (
         <div className="text-sm text-muted-foreground text-right mt-4">
-          Showing {commits.length} weeks of data for{" "}
-          <span className="font-medium">{repoUrl}</span>
+          Showing {weeklyCommits.length} weeks of data for{" "}
+          <span className="font-medium">{decodedRepo}</span>
         </div>
       )}
     </div>

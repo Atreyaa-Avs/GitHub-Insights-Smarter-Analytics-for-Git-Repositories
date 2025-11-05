@@ -2,7 +2,7 @@ import { inngest } from "@/inngest/client";
 import { prisma } from "@/utils/prisma";
 import { NextRequest, NextResponse } from "next/server";
 
-// Utility to safely serialize BigInt fields
+// ---------------- Helper: Safe JSON serialization ----------------
 function safeJson(data: any) {
   return JSON.parse(
     JSON.stringify(data, (_, value) =>
@@ -11,27 +11,29 @@ function safeJson(data: any) {
   );
 }
 
+// ---------------- GET: Pull Requests with Pagination ----------------
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const repoUrl = searchParams.get("repoUrl");
-
-  if (!repoUrl || !repoUrl.includes("/")) {
-    return NextResponse.json(
-      { error: "Valid repoUrl is required (format: owner/repo)" },
-      { status: 400 }
-    );
-  }
-
-  const [owner, name] = repoUrl.split("/");
-
   try {
-    // 1️⃣ Check if repo exists in DB
+    const { searchParams } = new URL(request.url);
+    const repoUrl = searchParams.get("repoUrl");
+    const page = parseInt(searchParams.get("page") || "1", 10);
+    const limit = parseInt(searchParams.get("limit") || "50", 10);
+
+    if (!repoUrl || !repoUrl.includes("/")) {
+      return NextResponse.json(
+        { error: "Valid repoUrl is required (format: owner/repo)" },
+        { status: 400 }
+      );
+    }
+
+    const [owner, name] = repoUrl.split("/");
+
+    // 1️⃣ Check if repo exists
     const repo = await prisma.repo.findUnique({
       where: { owner_name: { owner, name } },
     });
 
     if (!repo) {
-      // Trigger Inngest sync if repo is missing
       await inngest.send({
         name: "repo/sync.pulls",
         data: { owner, name },
@@ -42,14 +44,18 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // 2️⃣ Fetch latest 50 PRs from DB
+    // 2️⃣ Compute pagination params
+    const skip = (page - 1) * limit;
+
+    // 3️⃣ Fetch PRs with pagination
     const pulls = await prisma.pull.findMany({
       where: { repo_id: repo.id },
       orderBy: { created_at: "desc" },
-      take: 50,
+      skip,
+      take: limit,
     });
 
-    // Trigger Inngest if no PRs found
+    // 4️⃣ If no data found → trigger Inngest sync
     if (!pulls.length) {
       await inngest.send({
         name: "repo/sync.pulls",
@@ -63,15 +69,19 @@ export async function GET(request: NextRequest) {
 
     const totalCount = await prisma.pull.count({ where: { repo_id: repo.id } });
     const safePulls = safeJson(pulls);
+    const totalPages = Math.ceil(totalCount / limit);
 
+    // 5️⃣ Return paginated result
     return NextResponse.json({
       totalCount,
-      latestCount: safePulls.length,
+      totalPages,
+      currentPage: page,
+      perPage: limit,
       pulls: safePulls,
       source: "Database",
     });
   } catch (error) {
-    console.error("❌ GET /pulls error:", error);
+    console.error("❌ [GET /pulls] Error:", error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Internal Server Error" },
       { status: 500 }

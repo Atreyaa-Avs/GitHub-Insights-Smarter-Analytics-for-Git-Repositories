@@ -1,7 +1,11 @@
 "use client";
 
 import * as React from "react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
+import Image from "next/image";
+import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Pagination,
@@ -11,10 +15,8 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
-import { useSearchParams } from "next/navigation";
-import Image from "next/image";
-import Link from "next/link";
 
+// ------------------- Types -------------------
 type Contributor = {
   login: string;
   avatar_url: string;
@@ -22,51 +24,60 @@ type Contributor = {
   contributions: number;
 };
 
+interface ContributorsApiResponse {
+  topContributors: Contributor[];
+  totalContributors: number;
+}
+
+// ------------------- Fetch Function -------------------
+const fetchContributors = async (repoUrl: string): Promise<ContributorsApiResponse> => {
+  const res = await fetch(`/api/get-contributors?repoUrl=${encodeURIComponent(repoUrl)}`);
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || "Failed to fetch contributors");
+  }
+
+  const data = await res.json();
+
+  return {
+    topContributors: (data.topContributors || []).map((c: any) => ({
+      login: c.login || "unknown",
+      avatar_url: c.avatar_url || "/default-avatar.png",
+      type: c.type || "User",
+      contributions: c.contributions ?? 0,
+    })),
+    totalContributors: data.totalContributors ?? data.topContributors?.length ?? 0,
+  };
+};
+
+// ------------------- Component -------------------
 export default function Contributors() {
   const searchParams = useSearchParams();
-  const repoUrl = searchParams.get("repoUrl"); // ?repoUrl=owner/repo
+  const repoUrl = searchParams.get("repoUrl") || "";
+  const decodedRepo = decodeURIComponent(repoUrl);
 
-  const [loading, setLoading] = useState(true);
-  const [contributors, setContributors] = useState<Contributor[]>([]);
-  const [total, setTotal] = useState<number | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  useEffect(() => {
-    if (!repoUrl) return;
+  // ------------------- React Query -------------------
+  const { data, isLoading, isError, error } = useQuery({
+    queryKey: ["contributors", decodedRepo],
+    queryFn: () => fetchContributors(decodedRepo),
+    enabled: !!decodedRepo,
+  });
 
-    async function fetchContributors() {
-      try {
-        setLoading(true);
-        const res = await fetch(`/api/get-contributors?repoUrl=${repoUrl}`);
-        const data = await res.json();
-        console.log(data);
+  const contributors = data?.topContributors || [];
+  const totalContributors = data?.totalContributors || contributors.length;
 
-        if (!res.ok) throw new Error(data.error || "Failed to fetch");
+  // ------------------- Pagination -------------------
+  const totalPages = Math.ceil(contributors.length / itemsPerPage);
+  const currentContributors = contributors.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
-        setContributors(data.topContributors);
-        setTotal(data.totalContributors);
-      } catch (err: any) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchContributors();
-  }, [repoUrl]);
-
-  // ------------------- Pagination logic -------------------
-  const totalPages = Math.ceil(contributors?.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const currentContributors = contributors?.slice(startIndex, endIndex);
-
-  // ------------------- Skeleton Loading UI -------------------
-  if (loading) {
+  // ------------------- Loading -------------------
+  if (isLoading) {
     return (
       <div className="p-6">
         <Skeleton className="h-6 w-48 mb-4" />
@@ -88,17 +99,17 @@ export default function Contributors() {
     );
   }
 
-  // ------------------- Error UI -------------------
-  if (error) {
+  // ------------------- Error -------------------
+  if (isError) {
     return (
       <div className="p-6 text-red-500">
-        <p>⚠️ Error: {error}</p>
+        <p>⚠️ Error: {(error as Error)?.message}</p>
       </div>
     );
   }
 
   // ------------------- Empty State -------------------
-  if (!contributors?.length) {
+  if (!contributors.length) {
     return (
       <div className="p-6 text-muted-foreground">
         <p>No contributors found for this repository.</p>
@@ -110,7 +121,7 @@ export default function Contributors() {
   return (
     <div className="p-6">
       <h2 className="text-xl font-semibold mb-4">
-        Top Contributors ({total ?? contributors.length})
+        Top Contributors ({totalContributors})
       </h2>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -120,19 +131,14 @@ export default function Contributors() {
             target="_blank"
             key={c.login}
           >
-            <div
-              key={c.login}
-              className="flex items-center gap-4 border rounded-2xl p-4 shadow-sm hover:shadow-md transition-all"
-            >
-              {c.avatar_url && (
-                <Image
-                  src={c.avatar_url || "/default-avatar.png"}
-                  alt={c.login}
-                  width={50}
-                  height={50}
-                  className="rounded-full"
-                />  
-              )}
+            <div className="flex items-center gap-4 border rounded-2xl p-4 shadow-sm hover:shadow-md transition-all">
+              <Image
+                src={c.avatar_url || "/default-avatar.png"}
+                alt={c.login}
+                width={50}
+                height={50}
+                className="rounded-full"
+              />
               <div className="flex-1">
                 <p className="font-medium text-foreground">{c.login}</p>
                 <p className="text-sm text-muted-foreground">

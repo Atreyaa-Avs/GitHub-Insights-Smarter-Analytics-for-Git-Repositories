@@ -1,10 +1,12 @@
 "use client";
 
 import { Skeleton } from "@/components/ui/skeleton";
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { useSearchParams } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 
 interface RepoData {
+  id: number;
   name: string;
   description?: string;
   visibility?: string;
@@ -28,6 +30,39 @@ interface RepoData {
   topics?: string[];
 }
 
+const fetchRepo = async (repoUrl: string): Promise<RepoData | null> => {
+  const res = await fetch(`/api/get-repo?repoUrl=${encodeURIComponent(repoUrl)}`);
+  if (!res.ok) throw new Error("Failed to fetch repository");
+  const data = await res.json();
+
+  if (!data.name) return null;
+
+  return {
+    id: data.id,
+    name: data.name,
+    description: data.description,
+    visibility: data.visibility,
+    default_branch: data.default_branch,
+    created_at: data.created_at,
+    updated_at: data.updated_at,
+    pushed_at: data.pushed_at,
+    stargazers_count: data.stargazers_count,
+    watchers_count: data.watchers_count,
+    subscribers_count: data.subscribers_count,
+    forks_count: data.forks_count,
+    branch_count: data.branch_count,
+    tag_count: data.tag_count,
+    open_prs_count: data.open_prs_count,
+    open_issues_count: data.open_issues_count,
+    size_kb: data.size_kb,
+    language: data.language,
+    license_name: data.license_name,
+    homepage: data.homepage,
+    last_commit: data.last_commit,
+    topics: Array.isArray(data.topics) ? data.topics : [],
+  };
+};
+
 function formatIndianNumber(num: number | string): string {
   return new Intl.NumberFormat("en-IN").format(Number(num));
 }
@@ -37,124 +72,36 @@ const Repo = () => {
   const repoUrl = searchParams.get("repoUrl") || "";
   const decodedRepo = decodeURIComponent(repoUrl);
 
-  const [data, setData] = useState<RepoData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isError, setIsError] = useState(false);
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["repo", decodedRepo],
+    queryFn: () => fetchRepo(decodedRepo),
+    enabled: !!decodedRepo,
+    refetchInterval: 3000, // keeps retrying every 3s
+  });
 
-  useEffect(() => {
-    if (!decodedRepo) return;
-
-    const fetchRepo = async () => {
-      setIsLoading(true);
-      setIsError(false);
-
-      try {
-        const res = await fetch(
-          `/api/get-repo?repoUrl=${encodeURIComponent(decodedRepo)}`
-        );
-        const result = await res.json();
-
-        // Case 1: Repo found
-        if (result.name) {
-          setData({
-            name: result.name,
-            description: result.description,
-            visibility: result.visibility,
-            default_branch: result.default_branch,
-            created_at: result.created_at,
-            updated_at: result.updated_at,
-            pushed_at: result.pushed_at,
-            stargazers_count: result.stargazers_count,
-            watchers_count: result.watchers_count,
-            subscribers_count: result.subscribers_count,
-            forks_count: result.forks_count,
-            branch_count: result.branch_count,
-            tag_count: result.tag_count,
-            open_prs_count: result.open_prs_count,
-            open_issues_count: result.open_issues_count,
-            size_kb: result.size_kb,
-            language: result.language,
-            license_name: result.license_name,
-            homepage: result.homepage,
-            last_commit: result.last_commit,
-            topics: Array.isArray(result.topics) ? result.topics : [],
-          });
-        }
-
-        // Case 2: Queued (Inngest will fetch in background)
-        else if (result.status === "queued") {
-          console.log("Fetching repo in background...");
-
-          // Optional: Poll the API every 3 seconds to see if repo is ready
-          const interval = setInterval(async () => {
-            const check = await fetch(
-              `/api/get-repo?repoUrl=${encodeURIComponent(decodedRepo)}`
-            );
-            const checkData = await check.json();
-            if (checkData.name) {
-              setData(checkData);
-              clearInterval(interval);
-              setIsLoading(false);
-            }
-          }, 3000);
-
-          // Safety timeout to avoid infinite polling
-          setTimeout(() => clearInterval(interval), 30000);
-        }
-
-        // No data
-        else {
-          setData(null);
-        }
-      } catch (err) {
-        setIsError(true);
-        setData(null);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchRepo();
-  }, [decodedRepo]);
-
-  const renderField = (value: any, isNumber = false) => {
-    if (isLoading) return <Skeleton className="h-5 w-32" />;
-    if (!value) return null;
+  const renderField = (value?: string | number, isNumber = false) => {
+    if (isLoading || !value) return <Skeleton className="h-5 w-32" />;
+    // if (!value) return <span className="text-gray-500">—</span>;
     return isNumber ? formatIndianNumber(value) : value;
   };
 
   const renderDateField = (dateStr?: string) => {
-    if (isLoading) return <Skeleton className="h-5 w-32" />;
-    if (!dateStr) return null;
+    if (isLoading || !dateStr) return <Skeleton className="h-5 w-32" />;
+    // if (!dateStr) return <span className="text-gray-500">—</span>;
     return new Date(dateStr).toLocaleDateString();
   };
 
   const renderLinkField = (url?: string) => {
-    if (isLoading) return <Skeleton className="h-5 w-32" />;
-    if (!url) return null;
+    if (isLoading || !url) return <Skeleton className="h-5 w-32" />;
+    // if (!url) return <span className="text-gray-500">—</span>;
     return (
-      <a
-        href={url}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="underline text-blue-600"
-      >
+      <a href={url} target="_blank" rel="noopener noreferrer" className="underline text-blue-600">
         {url}
       </a>
     );
   };
 
-  if (isError) {
-    return <p className="text-red-500">Failed to load repository data.</p>;
-  }
-
-  if (!data && !isLoading) {
-    return <p className="text-gray-500">No data available</p>;
-  }
-
-  if (!data && !isError && !isLoading) {
-    return <p className="text-gray-500">Fetching repo data from GitHub...</p>;
-  }
+  if (isError) return <p className="text-red-500">Failed to load repository data.</p>;
 
   return (
     <div className="flex-1 mt-4 overflow-auto">
@@ -173,12 +120,11 @@ const Repo = () => {
               <strong>Visibility:</strong> {renderField(data?.visibility)}
             </p>
             <p className="inline-flex items-center gap-2">
-              <strong>Default Branch:</strong>{" "}
-              {renderField(data?.default_branch)}
+              <strong>Default Branch:</strong> {renderField(data?.default_branch)}
             </p>
-            <p className="inline-flex items-center gap-2">
+            {/* <p className="inline-flex items-center gap-2">
               <strong>Created At:</strong> {renderDateField(data?.created_at)}
-            </p>
+            </p> */}
             <p className="inline-flex items-center gap-2">
               <strong>Updated At:</strong> {renderDateField(data?.updated_at)}
             </p>
@@ -187,16 +133,13 @@ const Repo = () => {
             </p>
 
             <p className="inline-flex items-center gap-2">
-              <strong>Stars:</strong>{" "}
-              {renderField(data?.stargazers_count, true)}
+              <strong>Stars:</strong> {renderField(data?.stargazers_count, true)}
             </p>
             <p className="inline-flex items-center gap-2">
-              <strong>Watchers:</strong>{" "}
-              {renderField(data?.watchers_count, true)}
+              <strong>Watchers:</strong> {renderField(data?.watchers_count, true)}
             </p>
             <p className="inline-flex items-center gap-2">
-              <strong>Subscribers:</strong>{" "}
-              {renderField(data?.subscribers_count, true)}
+              <strong>Subscribers:</strong> {renderField(data?.subscribers_count, true)}
             </p>
             <p className="inline-flex items-center gap-2">
               <strong>Forks:</strong> {renderField(data?.forks_count, true)}
@@ -208,21 +151,15 @@ const Repo = () => {
               <strong>Tags:</strong> {renderField(data?.tag_count, true)}
             </p>
             <p className="inline-flex items-center gap-2">
-              <strong>Open PRs:</strong>{" "}
-              {renderField(data?.open_prs_count, true)}
+              <strong>Open PRs:</strong> {renderField(data?.open_prs_count, true)}
             </p>
             <p className="inline-flex items-center gap-2">
-              <strong>Open Issues:</strong>{" "}
-              {renderField(data?.open_issues_count, true)}
+              <strong>Open Issues:</strong> {renderField(data?.open_issues_count, true)}
             </p>
 
             <p className="inline-flex items-center gap-2">
               <strong>Size:</strong>{" "}
-              {data?.size_kb ? (
-                formatIndianNumber((data.size_kb / 1024).toFixed(1)) + " MB"
-              ) : isLoading ? (
-                <Skeleton className="h-5 w-32" />
-              ) : null}
+              {data?.size_kb ? `${formatIndianNumber((data.size_kb / 1024).toFixed(1))} MB` : <Skeleton className="h-5 w-32" />}
             </p>
 
             <p className="inline-flex items-center gap-2">
@@ -239,18 +176,16 @@ const Repo = () => {
             </p>
           </div>
 
-          {data?.topics && data.topics.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-2">
-              {data.topics.map((topic) => (
-                <span
-                  key={topic}
-                  className="bg-blue-100 text-blue-700 rounded-full px-2 text-xs font-semibold"
-                >
-                  {topic}
-                </span>
-              ))}
-            </div>
-          )}
+          <div className="flex flex-wrap gap-1 mt-2">
+            {(isLoading ? Array(3).fill(null) : data?.topics || []).map((topic, idx) => (
+              <span
+                key={topic || idx}
+                className="bg-blue-100 text-blue-700 rounded-full px-2 text-xs font-semibold"
+              >
+                {topic || <Skeleton className="h-4 w-10 inline-block" />}
+              </span>
+            ))}
+          </div>
         </div>
       </div>
     </div>

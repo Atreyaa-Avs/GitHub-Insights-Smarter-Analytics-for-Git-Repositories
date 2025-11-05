@@ -20,7 +20,10 @@ export async function GET(request: NextRequest) {
   const repoUrl = decodeURIComponent(searchParams.get("repoUrl") || "");
 
   if (!repoUrl || !repoUrl.includes("/")) {
-    return NextResponse.json({ error: "Valid repoUrl required (owner/repo)" }, { status: 422 });
+    return NextResponse.json(
+      { error: "Valid repoUrl required (owner/repo)" },
+      { status: 422 }
+    );
   }
 
   const [owner, name] = repoUrl.split("/");
@@ -31,41 +34,51 @@ export async function GET(request: NextRequest) {
       where: { owner_name: { owner, name } },
     });
 
+    // 2️⃣ Repo not found → queue Inngest sync
     if (!repo) {
-      await inngest.send({
+      const event = await inngest.send({
         name: "repo/sync.weeklyCommits",
         data: { owner, name },
-      });
+      })
+
       return NextResponse.json({
         status: "queued",
         message: `Weekly commits sync started for ${owner}/${name} as repo was missing`,
       });
     }
 
-    // 2️⃣ Fetch weekly commits from DB
+    // 3️⃣ Fetch weekly commits from DB
     const weeklyCommits = await prisma.weeklyCommit.findMany({
       where: { repo_id: repo.id },
       orderBy: { week: "asc" },
     });
 
-    // Trigger Inngest if DB empty
+    // 4️⃣ DB empty → trigger Inngest again
     if (!weeklyCommits.length) {
-      await inngest.send({
+      const event = await inngest.send({
         name: "repo/sync.weeklyCommits",
         data: { owner, name },
-      });
+      })
+
       return NextResponse.json({
         status: "queued",
         message: `Weekly commits sync started for ${owner}/${name} as no data was found`,
       });
     }
 
+    // 5️⃣ Return weekly commits safely
     return NextResponse.json({
       weeklyCommits: safeSerialize(weeklyCommits),
       source: "Database",
     });
   } catch (error) {
     console.error("❌ GET /weekly-commits error:", error);
-    return NextResponse.json({ error: error instanceof Error ? error.message : "Internal Server Error" }, { status: 500 });
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error ? error.message : "Internal Server Error",
+      },
+      { status: 500 }
+    );
   }
 }

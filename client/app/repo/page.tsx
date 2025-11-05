@@ -18,15 +18,51 @@ import Releases from "./Releases";
 import TopCommitters from "./TopCommits";
 import WeeklyCommits from "./WeeklyCommits";
 import { Card } from "@/components/ui/card";
+import ContributorMomentumTracker from "./ContributorMomentumTracker";
+import PRLifecycleDashboard from "./PRLifecycleDashboard";
+import ReleaseImpactTimeline from "./ReleaseImpactTimeline";
+import CodeRhythmHeatmap from "./CodeRhythmHeatmap";
+import ContributorImpactLeaderboard from "./ContributorImpactLeaderboard";
+import AIResume from "@/components/AIResume";
 
-// Simple fetch for repo GET → POST fallback
+// ---------------- SafeImage Helper ----------------
+interface SafeImageProps {
+  src?: string;
+  alt: string;
+  width: number;
+  height: number;
+  className?: string;
+}
+
+const SafeImage: React.FC<SafeImageProps> = ({
+  src,
+  alt,
+  width,
+  height,
+  className,
+}) => {
+  if (!src)
+    return (
+      <Skeleton className={`h-[${height}px] w-[${width}px] ${className}`} />
+    );
+  return (
+    <Image
+      src={src}
+      alt={alt}
+      width={width}
+      height={height}
+      className={className}
+    />
+  );
+};
+
+// ---------------- API Fetchers ----------------
 const fetchRepo = async (repoUrl: string) => {
   let res = await fetch(`/api/get-repo?repoUrl=${encodeURIComponent(repoUrl)}`);
   if (!res.ok) throw new Error("Failed to fetch repo GET");
 
   let data = await res.json();
 
-  // If empty, fallback to POST
   if (!data || Object.keys(data).length === 0 || "message" in data) {
     res = await fetch(`/api/get-repo`, {
       method: "POST",
@@ -44,11 +80,10 @@ const fetchCommits = async (repoUrl: string) => {
   let res = await fetch(
     `/api/get-commits?repoUrl=${encodeURIComponent(repoUrl)}`
   );
-  if (!res.ok) throw new Error("Failed to fetch repo GET");
+  if (!res.ok) throw new Error("Failed to fetch commits GET");
 
   let data = await res.json();
 
-  // If empty, fallback to POST
   if (!data || Object.keys(data).length === 0 || "message" in data) {
     res = await fetch(`/api/get-repo`, {
       method: "POST",
@@ -62,6 +97,7 @@ const fetchCommits = async (repoUrl: string) => {
   return data;
 };
 
+// ---------------- Page Component ----------------
 const Page = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -91,8 +127,9 @@ const Page = () => {
           <ArrowLeft />
           Go Back
         </Button>
+
         <Link
-          href={`${repoQuery.data?.html_url}`}
+          href={`${repoQuery.data?.html_url || "#"}`}
           target="_blank"
           rel="noopener noreferrer"
           className="mr-4 hover:underline"
@@ -102,11 +139,11 @@ const Page = () => {
               {repoQuery.isLoading ? (
                 <Skeleton className="h-10 w-10 rounded-full" />
               ) : (
-                <Image
-                  src={repoQuery?.data?.avatar_url}
+                <SafeImage
+                  src={repoQuery.data?.avatar_url}
                   alt="avatar-url"
-                  height={30}
                   width={30}
+                  height={30}
                   className="rounded-full"
                 />
               )}
@@ -114,7 +151,7 @@ const Page = () => {
                 {repoQuery.isLoading ? (
                   <Skeleton className="h-8 w-48" />
                 ) : (
-                  repoQuery.data?.name
+                  repoQuery.data?.name || "Unknown Repo"
                 )}
               </h1>
             </div>
@@ -124,7 +161,9 @@ const Page = () => {
             )}
           </div>
         </Link>
-        <div>
+
+        <div className="flex items-center">
+          <AIResume />
           <AnimatedThemeToggler />
         </div>
       </div>
@@ -132,20 +171,24 @@ const Page = () => {
       <div className="grid grid-cols-3 mx-20">
         {/* Repository Overview */}
         <Repo />
+
         {/* Recent Commits */}
         <div className="col-span-2 ml-4">
           <Commits />
         </div>
-        <div className="col-span-3 my-4">
+
+        <div className="col-span-3 mt-8">
           <Card>
             <WeeklyCommits />
           </Card>
         </div>
+
         <div className="col-span-3 mt-12">
           <Card>
             <Contributors />
           </Card>
         </div>
+
         <div className="grid grid-cols-2 col-span-3">
           <div className="mt-12 mr-4">
             <Card>
@@ -158,26 +201,42 @@ const Page = () => {
             </Card>
           </div>
         </div>
+
         <div className="mt-12 col-span-3">
           <Card>
             <Releases />
           </Card>
         </div>
         {/* <TopCommitters /> */}
+        <ContributorMomentumTracker />
+        <PRLifecycleDashboard />
+        <ReleaseImpactTimeline />
+        <CodeRhythmHeatmap />
+        <ContributorImpactLeaderboard />
       </div>
+
+      {/* Footer Section */}
       <div className="flex justify-between items-center bg-gradient-to-r from-purple-700 to-zinc-700 shadow-2xl mx-20 my-4 rounded-xl px-4">
-        <Image
-          src="/logo.svg"
-          alt="Gitlytics"
-          width={1550}
-          height={1550}
-          className="w-full h-auto max-w-[250px]"
-        />
-        <p className="text-center ml-48 bg-white shadow-md py-3 px-8 text-xl rounded-xl">
+        <div className="ml-12">
+          <SafeImage
+            src="/logo.svg"
+            alt="Gitlytics"
+            width={1550}
+            height={1550}
+            className="w-full h-auto max-w-[250px]"
+          />
+          <div className="mt-5 text-white font-inter">
+            <p>221B Data Street</p>
+            <p>Suite 404 (Not Found)</p>
+            <p>R V University, BLR 560059</p>
+            <p>Banglore, India</p>
+          </div>
+        </div>
+        <p className="text-center ml-48 bg-white shadow-md py-3 px-8 text-lg rounded-xl">
           Github Pipeline Dashboard for FDE Project
         </p>
-        <Image
-          src={"/photos/footerPhoto1.png"}
+        <SafeImage
+          src="/photos/footerPhoto1.png"
           width={520}
           height={500}
           alt="FooterPhoto"

@@ -40,6 +40,9 @@ model Repo {
   topics            String[]  @default([])
   last_commit       DateTime?
 
+  // field for tracking last update timestamp
+  lastUpdatedOn     DateTime?
+
   // Relations
   commits            Commit[]
   contributorRanks   ContributorRank[]

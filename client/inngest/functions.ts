@@ -160,6 +160,7 @@ export const fetchRepoData = inngest.createFunction(
         last_commit: lastCommitDate ? new Date(lastCommitDate) : null,
         avatar_url: repoData.owner?.avatar_url ?? null,
         html_url: repoData.html_url,
+        lastUpdatedOn: new Date(), // ✅ add this
       },
       create: {
         owner,
@@ -186,6 +187,7 @@ export const fetchRepoData = inngest.createFunction(
         last_commit: lastCommitDate ? new Date(lastCommitDate) : null,
         avatar_url: repoData.owner?.avatar_url ?? null,
         html_url: repoData.html_url,
+        lastUpdatedOn: new Date(), // ✅ add this
       },
     });
   }
@@ -693,7 +695,9 @@ export const syncReleases = inngest.createFunction(
       });
 
       if (found?.id) {
-        console.log(`🔁 Found existing repo: ${owner}/${name} (ID: ${found.id})`);
+        console.log(
+          `🔁 Found existing repo: ${owner}/${name} (ID: ${found.id})`
+        );
         return safeJson(found); // convert BigInt to string
       }
 
@@ -751,7 +755,9 @@ export const syncReleases = inngest.createFunction(
     await step.run("Upsert releases", async () => {
       const ops = releasesData.map((r: any) => {
         const createdAt = r.created_at ? new Date(r.created_at) : new Date();
-        const publishedAt = r.published_at ? new Date(r.published_at) : new Date();
+        const publishedAt = r.published_at
+          ? new Date(r.published_at)
+          : new Date();
 
         return prisma.release.upsert({
           where: { release_id: BigInt(r.id) },
@@ -792,8 +798,6 @@ export const syncReleases = inngest.createFunction(
     };
   }
 );
-
-
 
 export const syncWeeklyCommits = inngest.createFunction(
   { id: "sync-weekly-commits" },

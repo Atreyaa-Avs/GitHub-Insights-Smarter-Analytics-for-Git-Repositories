@@ -52,16 +52,10 @@ const Repo = () => {
         const res = await fetch(
           `/api/get-repo?repoUrl=${encodeURIComponent(decodedRepo)}`
         );
-        if (!res.ok) throw new Error("Failed to fetch repo GET");
-
         const result = await res.json();
-        if (
-          !result ||
-          Object.keys(result).length === 0 ||
-          "message" in result
-        ) {
-          setData(null);
-        } else {
+
+        // Case 1: Repo found
+        if (result.name) {
           setData({
             name: result.name,
             description: result.description,
@@ -85,6 +79,32 @@ const Repo = () => {
             last_commit: result.last_commit,
             topics: Array.isArray(result.topics) ? result.topics : [],
           });
+        }
+
+        // Case 2: Queued (Inngest will fetch in background)
+        else if (result.status === "queued") {
+          console.log("Fetching repo in background...");
+
+          // Optional: Poll the API every 3 seconds to see if repo is ready
+          const interval = setInterval(async () => {
+            const check = await fetch(
+              `/api/get-repo?repoUrl=${encodeURIComponent(decodedRepo)}`
+            );
+            const checkData = await check.json();
+            if (checkData.name) {
+              setData(checkData);
+              clearInterval(interval);
+              setIsLoading(false);
+            }
+          }, 3000);
+
+          // Safety timeout to avoid infinite polling
+          setTimeout(() => clearInterval(interval), 30000);
+        }
+
+        // No data
+        else {
+          setData(null);
         }
       } catch (err) {
         setIsError(true);
@@ -130,6 +150,10 @@ const Repo = () => {
 
   if (!data && !isLoading) {
     return <p className="text-gray-500">No data available</p>;
+  }
+
+  if (!data && !isError && !isLoading) {
+    return <p className="text-gray-500">Fetching repo data from GitHub...</p>;
   }
 
   return (

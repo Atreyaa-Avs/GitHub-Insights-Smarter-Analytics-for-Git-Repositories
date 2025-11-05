@@ -60,10 +60,10 @@ export default function Contributors() {
   }, [repoUrl]);
 
   // ------------------- Pagination logic -------------------
-  const totalPages = Math.ceil(contributors.length / itemsPerPage);
+  const totalPages = Math.ceil(contributors?.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const currentContributors = contributors.slice(startIndex, endIndex);
+  const currentContributors = contributors?.slice(startIndex, endIndex);
 
   // ------------------- Skeleton Loading UI -------------------
   if (loading) {
@@ -98,7 +98,7 @@ export default function Contributors() {
   }
 
   // ------------------- Empty State -------------------
-  if (!contributors.length) {
+  if (!contributors?.length) {
     return (
       <div className="p-6 text-muted-foreground">
         <p>No contributors found for this repository.</p>
@@ -124,13 +124,15 @@ export default function Contributors() {
               key={c.login}
               className="flex items-center gap-4 border rounded-2xl p-4 shadow-sm hover:shadow-md transition-all"
             >
-              <Image
-                src={c.avatar_url || "/default-avatar.png"}
-                alt={c.login}
-                width={50}
-                height={50}
-                className="rounded-full"
-              />
+              {c.avatar_url && (
+                <Image
+                  src={c.avatar_url || "/default-avatar.png"}
+                  alt={c.login}
+                  width={50}
+                  height={50}
+                  className="rounded-full"
+                />  
+              )}
               <div className="flex-1">
                 <p className="font-medium text-foreground">{c.login}</p>
                 <p className="text-sm text-muted-foreground">

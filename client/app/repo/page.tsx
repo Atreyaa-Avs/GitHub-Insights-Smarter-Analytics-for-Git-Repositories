@@ -92,7 +92,7 @@ const Page = () => {
           Go Back
         </Button>
         <Link
-          href={`${repoQuery.data?.html_url}` || "#"}
+          href={`${repoQuery.data?.html_url}`}
           target="_blank"
           rel="noopener noreferrer"
           className="mr-4 hover:underline"
@@ -103,7 +103,7 @@ const Page = () => {
                 <Skeleton className="h-10 w-10 rounded-full" />
               ) : (
                 <Image
-                  src={repoQuery.data?.avatar_url!}
+                  src={repoQuery?.data?.avatar_url}
                   alt="avatar-url"
                   height={30}
                   width={30}

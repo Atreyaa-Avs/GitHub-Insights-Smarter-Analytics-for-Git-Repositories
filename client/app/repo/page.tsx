@@ -24,6 +24,8 @@ import ReleaseImpactTimeline from "./ReleaseImpactTimeline";
 import CodeRhythmHeatmap from "./CodeRhythmHeatmap";
 import ContributorImpactLeaderboard from "./ContributorImpactLeaderboard";
 import AIResume from "@/components/AIResume";
+import DBTalk from "@/components/DBTalk";
+import { TriggerSyncButton } from "./TriggerWorkflow";
 
 // ---------------- SafeImage Helper ----------------
 interface SafeImageProps {
@@ -163,6 +165,8 @@ const Page = () => {
         </Link>
 
         <div className="flex items-center">
+          <TriggerSyncButton />
+          <DBTalk />
           <AIResume />
           <AnimatedThemeToggler />
         </div>

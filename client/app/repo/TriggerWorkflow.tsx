@@ -3,16 +3,17 @@
 import React, { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { inngest } from "@/inngest/client";
 
 export const TriggerSyncButton: React.FC = () => {
   const searchParams = useSearchParams();
   const repoUrl = searchParams.get("repoUrl") ?? "";
-  const owner = searchParams.get("owner") ?? "";
-  const name = searchParams.get("name") ?? "";
+
+  // Extract owner and repo name from repoUrl
+  const [owner, name] = repoUrl.split("/");
 
   const [loading, setLoading] = useState(false);
   const [lastUpdatedOn, setLastUpdatedOn] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   // Fetch repo data to get lastUpdatedOn
   const fetchRepoData = async () => {
@@ -26,6 +27,7 @@ export const TriggerSyncButton: React.FC = () => {
       }
     } catch (err) {
       console.error("Error fetching repo data:", err);
+      setError("Failed to fetch repo data");
     }
   };
 
@@ -34,47 +36,53 @@ export const TriggerSyncButton: React.FC = () => {
   }, [repoUrl]);
 
   const triggerSync = async () => {
-    if (!owner || !name) return;
+    if (!owner || !name) {
+      setError("Invalid repo URL");
+      console.error("Invalid repo URL:", repoUrl);
+      return;
+    }
+
     setLoading(true);
+    setError(null);
+
     try {
-      const functions = [
-        "sync-overview",
-        "sync-commits",
-        "sync-contributors",
-        "sync-issues",
-        "sync-languages",
-        "sync-participation",
-        "sync-pulls",
-        "sync-releases",
-        "sync-weekly-commits",
-      ];
+      console.log("Triggering sync for:", { owner, name });
 
-      await Promise.all(
-        functions.map((fn) =>
-          inngest.send({
-            name: fn,
-            data: { owner, name },
-          })
-        )
-      );
+      const res = await fetch("/api/trigger-sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ owner, name }),
+      });
 
-      console.log("Sync completed");
-      fetchRepoData();
+      const data = await res.json();
+      console.log("API response:", data);
+
+      if (data.success) {
+        console.log("Sync completed successfully");
+        await fetchRepoData();
+      } else {
+        console.error("Sync failed:", data.error);
+        setError(data.error || "Sync failed");
+      }
     } catch (err) {
       console.error("Error triggering sync:", err);
+      setError("Error triggering sync");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="flex items-center space-x-4">
-      {lastUpdatedOn && (
-        <span className="text-sm text-gray-500">Last updated: {lastUpdatedOn}</span>
-      )}
-      <Button onClick={triggerSync} disabled={loading}>
-        {loading ? "Syncing..." : "Sync Repository"}
-      </Button>
+    <div className="flex flex-col space-y-2">
+      <div className="flex items-center space-x-4">
+        {lastUpdatedOn && (
+          <span className="text-sm text-gray-500">Last updated: {lastUpdatedOn}</span>
+        )}
+        <Button onClick={triggerSync} disabled={loading}>
+          {loading ? "Syncing..." : "Sync Repository"}
+        </Button>
+      </div>
+      {error && <span className="text-sm text-red-500">{error}</span>}
     </div>
   );
 };

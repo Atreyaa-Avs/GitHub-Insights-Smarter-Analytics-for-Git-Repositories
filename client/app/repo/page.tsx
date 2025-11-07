@@ -18,11 +18,6 @@ import Releases from "./Releases";
 import TopCommitters from "./TopCommits";
 import WeeklyCommits from "./WeeklyCommits";
 import { Card } from "@/components/ui/card";
-import ContributorMomentumTracker from "./ContributorMomentumTracker";
-import PRLifecycleDashboard from "./PRLifecycleDashboard";
-import ReleaseImpactTimeline from "./ReleaseImpactTimeline";
-import CodeRhythmHeatmap from "./CodeRhythmHeatmap";
-import ContributorImpactLeaderboard from "./ContributorImpactLeaderboard";
 import AIResume from "@/components/AIResume";
 import DBTalk from "@/components/DBTalk";
 import { TriggerSyncButton } from "./TriggerWorkflow";
@@ -211,12 +206,6 @@ const Page = () => {
             <Releases />
           </Card>
         </div>
-        {/* <TopCommitters /> */}
-        <ContributorMomentumTracker />
-        <PRLifecycleDashboard />
-        <ReleaseImpactTimeline />
-        <CodeRhythmHeatmap />
-        <ContributorImpactLeaderboard />
       </div>
 
       {/* Footer Section */}

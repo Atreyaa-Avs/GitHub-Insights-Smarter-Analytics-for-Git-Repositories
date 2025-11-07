@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
 
     const [owner, name] = repoUrl.split("/");
 
-    // 1️⃣ Ensure the repo exists (create if missing)
+    // Ensure the repo exists (create if missing)
     const repo = await prisma.repo.upsert({
       where: { owner_name: { owner, name } },
       update: {},
@@ -34,14 +34,14 @@ export async function GET(request: NextRequest) {
 
     const repoId = BigInt(repo.id);
 
-    // 2️⃣ Try to fetch releases from DB
+    // Try to fetch releases from DB
     const releases = await prisma.release.findMany({
       where: { repo_id: repoId },
       orderBy: { published_at: "desc" },
       take: 50,
     });
 
-    // 3️⃣ If no releases found, trigger Inngest sync
+    // If no releases found, trigger Inngest sync
     if (!releases.length) {
       await inngest.send({
         name: "repo/sync.releases",
@@ -54,10 +54,10 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // 4️⃣ Count total releases
+    // Count total releases
     const totalCount = await prisma.release.count({ where: { repo_id: repoId } });
 
-    // 5️⃣ Return the data
+    // Return the data
     return NextResponse.json({
       status: "ok",
       repoId: repoId.toString(),
@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
       source: "Database",
     });
   } catch (error) {
-    console.error("❌ Unified GET /releases error:", error);
+    console.error("Unified GET /releases error:", error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Internal Server Error" },
       { status: 500 }

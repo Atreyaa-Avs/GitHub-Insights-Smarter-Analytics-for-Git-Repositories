@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "GitHub token not configured" }, { status: 500 });
 
   try {
-    // 1️⃣ Try fetching repo from DB
+    // Try fetching repo from DB
     const repo = await prisma.repo.findUnique({
       where: { owner_name: { owner, name } },
     });
@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // 2️⃣ Try fetching recent commits from DB
+    // Try fetching recent commits from DB
     const commitsFromDb = await prisma.commit.findMany({
       where: { repo_id: repo.id },
       orderBy: { committed_at: "desc" },
@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // 3️⃣ Return existing commits + total count
+    // Return existing commits + total count
     const recentCommits = commitsFromDb.map(normalizeCommit);
 
     const countRes = await fetch(

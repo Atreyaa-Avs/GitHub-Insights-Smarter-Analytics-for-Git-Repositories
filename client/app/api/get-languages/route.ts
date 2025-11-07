@@ -33,12 +33,12 @@ export async function GET(request: NextRequest) {
   const [owner, name] = repoUrl.split("/");
 
   try {
-    // 1️⃣ Check repo in DB
+    // Check repo in DB
     const repo = await prisma.repo.findUnique({
       where: { owner_name: { owner, name } },
     });
 
-    // 2️⃣ If repo missing → trigger Inngest background sync
+    // If repo missing → trigger Inngest background sync
     if (!repo) {
       console.log(`GET: Repo ${owner}/${name} not found, triggering language sync...`);
       await inngest.send({
@@ -51,13 +51,13 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // 3️⃣ Fetch languages from DB
+    // Fetch languages from DB
     const languagesRaw = await prisma.repoLanguage.findMany({
       where: { repo_id: repo.id },
       orderBy: { bytes_of_code: "desc" },
     });
 
-    // 4️⃣ If no languages → trigger Inngest background sync
+    // If no languages → trigger Inngest background sync
     if (!languagesRaw.length) {
       console.log(`GET: No languages in DB for ${owner}/${name}, triggering sync...`);
       await inngest.send({

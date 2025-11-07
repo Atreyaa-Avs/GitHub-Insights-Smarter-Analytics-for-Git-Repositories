@@ -23,12 +23,12 @@ export async function GET(request: NextRequest) {
 
     const [owner, name] = repoUrl.split("/");
 
-    // 1️⃣ Find repo
+    // Find repo
     const repo = await prisma.repo.findUnique({
       where: { owner_name: { owner, name } },
     });
 
-    // 2️⃣ If repo missing → trigger Inngest background sync
+    // If repo missing → trigger Inngest background sync
     if (!repo) {
       await inngest.send({
         name: "repo/sync.participation",
@@ -40,13 +40,13 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // 3️⃣ Fetch participation stats from DB
+    // Fetch participation stats from DB
     const rawStats = await prisma.participationStats.findMany({
       where: { repo_id: repo.id },
       orderBy: { week_start: "asc" },
     });
 
-    // 4️⃣ If no stats → trigger Inngest background sync
+    // If no stats → trigger Inngest background sync
     if (!rawStats.length) {
       await inngest.send({
         name: "repo/sync.participation",
@@ -58,8 +58,8 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // 5️⃣ Normalize stats
-    const stats: ParticipationStats[] = rawStats.map((r) => ({
+    // Normalize stats
+    const stats: ParticipationStats[] = rawStats.map((r:any) => ({
       repo_id: Number(r.repo_id),
       week_start: r.week_start,
       all_commits: Number(r.all_commits),
@@ -77,7 +77,7 @@ export async function GET(request: NextRequest) {
       source: "Database",
     });
   } catch (error: unknown) {
-    console.error("❌ GET /participation error:", error);
+    console.error("GET /participation error:", error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Internal Server Error" },
       { status: 500 }

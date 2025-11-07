@@ -29,12 +29,12 @@ export async function GET(request: NextRequest) {
   const [owner, name] = repoUrl.split("/");
 
   try {
-    // 1️⃣ Check if repo exists
+    // Check if repo exists
     const repo = await prisma.repo.findUnique({
       where: { owner_name: { owner, name } },
     });
 
-    // 2️⃣ Repo not found → queue Inngest sync
+    // Repo not found → queue Inngest sync
     if (!repo) {
       const event = await inngest.send({
         name: "repo/sync.weeklyCommits",
@@ -47,13 +47,13 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // 3️⃣ Fetch weekly commits from DB
+    // Fetch weekly commits from DB
     const weeklyCommits = await prisma.weeklyCommit.findMany({
       where: { repo_id: repo.id },
       orderBy: { week: "asc" },
     });
 
-    // 4️⃣ DB empty → trigger Inngest again
+    // DB empty → trigger Inngest again
     if (!weeklyCommits.length) {
       const event = await inngest.send({
         name: "repo/sync.weeklyCommits",
@@ -66,13 +66,13 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // 5️⃣ Return weekly commits safely
+    // Return weekly commits safely
     return NextResponse.json({
       weeklyCommits: safeSerialize(weeklyCommits),
       source: "Database",
     });
   } catch (error) {
-    console.error("❌ GET /weekly-commits error:", error);
+    console.error("GET /weekly-commits error:", error);
     return NextResponse.json(
       {
         error:

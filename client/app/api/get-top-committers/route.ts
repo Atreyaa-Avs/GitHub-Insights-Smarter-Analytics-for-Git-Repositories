@@ -2,7 +2,7 @@ import { prisma } from "@/utils/prisma";
 import { NextRequest, NextResponse } from "next/server";
 
 // -----------------------------------------------------------------------------
-// 🔹 Helper: Fetch top committers from GitHub and update DB
+// Helper: Fetch top committers from GitHub and update DB
 // -----------------------------------------------------------------------------
 async function fetchFromGitHubAndSave(owner: string, name: string, repoId: bigint) {
   const githubAccessToken = process.env.GITHUB_ACCESS_TOKEN;
@@ -10,7 +10,7 @@ async function fetchFromGitHubAndSave(owner: string, name: string, repoId: bigin
     throw new Error("GitHub token not configured");
   }
 
-  console.log(`⚡ Fetching top committers from GitHub for ${owner}/${name}...`);
+  console.log(`Fetching top committers from GitHub for ${owner}/${name}...`);
 
   const response = await fetch(
     `https://api.github.com/repos/${owner}/${name}/contributors?per_page=10`,
@@ -57,13 +57,13 @@ async function fetchFromGitHubAndSave(owner: string, name: string, repoId: bigin
     });
   }
 
-  console.log(`✅ Successfully fetched & saved ${contributors.length} contributors from GitHub`);
+  console.log(` Successfully fetched & saved ${contributors.length} contributors from GitHub`);
 
   return contributors;
 }
 
 // -----------------------------------------------------------------------------
-// 🔹 GET: Try to fetch from DB; fallback to GitHub (POST logic)
+// GET: Try to fetch from DB; fallback to GitHub (POST logic)
 // -----------------------------------------------------------------------------
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -86,7 +86,7 @@ export async function GET(request: NextRequest) {
 
     // Fallback if repo not found — trigger POST logic
     if (!repo) {
-      console.warn("⚠️ Repo not found in DB, fetching from GitHub via POST fallback...");
+      console.warn("Repo not found in DB, fetching from GitHub via POST fallback...");
       const contributors = await fetchFromGitHubAndSave(owner, name, BigInt(0)); // temporary repo_id
       return NextResponse.json({
         message: "Repo not in DB — fetched directly from GitHub.",
@@ -108,7 +108,7 @@ export async function GET(request: NextRequest) {
 
     if (topCommitters.length === 0 || issuesCount === 0) {
       console.warn(
-        `⚠️ Fallback: No committers or no issues found for ${owner}/${name}. Fetching from GitHub...`
+        `Fallback: No committers or no issues found for ${owner}/${name}. Fetching from GitHub...`
       );
       const contributors = await fetchFromGitHubAndSave(owner, name, repo.id);
       return NextResponse.json({
@@ -118,20 +118,20 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // ✅ If DB data available
+    // If DB data available
     return NextResponse.json({
       source: "database",
       totalContributors: topCommitters.length,
       topCommitters,
     });
   } catch (error) {
-    console.error("❌ Error in GET /get-top-committers:", error);
+    console.error("Error in GET /get-top-committers:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }
 
 // -----------------------------------------------------------------------------
-// 🔹 POST: Force-refresh top committers from GitHub
+//  POST: Force-refresh top committers from GitHub
 // -----------------------------------------------------------------------------
 export async function POST(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -163,7 +163,7 @@ export async function POST(request: NextRequest) {
       source: "github_post",
     });
   } catch (error) {
-    console.error("❌ Error in POST /get-top-committers:", error);
+    console.error("Error in POST /get-top-committers:", error);
     return NextResponse.json(
       { error: "Failed to fetch or save top committers" },
       { status: 500 }

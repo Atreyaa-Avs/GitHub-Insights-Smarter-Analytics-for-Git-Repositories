@@ -1,4 +1,3 @@
-// /app/api/trigger-sync/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { inngest } from "@/inngest/client";
 

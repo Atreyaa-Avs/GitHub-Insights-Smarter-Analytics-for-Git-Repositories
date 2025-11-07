@@ -27,13 +27,13 @@ export async function GET(request: NextRequest) {
     );
 
   try {
-    // 1️⃣ Try fetching repo from DB
+    // Try fetching repo from DB
     const repo = await prisma.repo.findUnique({
       where: { owner_name: { owner, name } },
       include: { commits: true },
     });
 
-    // 2️⃣ If repo not found → trigger Inngest function
+    // If repo not found → trigger Inngest function
     if (!repo) {
       console.log(
         `GET: Repo not found for ${owner}/${name}, triggering Inngest sync`
@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // 3️⃣ Repo exists → return DB data safely
+    // Repo exists → return DB data safely
     return NextResponse.json(safeJSON(repo));
   } catch (error) {
     console.error("GET /get-repo error:", error);

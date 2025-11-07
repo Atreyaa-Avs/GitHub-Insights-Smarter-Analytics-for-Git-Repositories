@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
 
     const [owner, name] = repoUrl.split("/");
 
-    // 1️⃣ Check if repo exists
+    // Check if repo exists
     const repo = await prisma.repo.findUnique({
       where: { owner_name: { owner, name } },
     });
@@ -44,10 +44,10 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // 2️⃣ Compute pagination params
+    // Compute pagination params
     const skip = (page - 1) * limit;
 
-    // 3️⃣ Fetch PRs with pagination
+    // Fetch PRs with pagination
     const pulls = await prisma.pull.findMany({
       where: { repo_id: repo.id },
       orderBy: { created_at: "desc" },
@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
       take: limit,
     });
 
-    // 4️⃣ If no data found → trigger Inngest sync
+    // If no data found → trigger Inngest sync
     if (!pulls.length) {
       await inngest.send({
         name: "repo/sync.pulls",
@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
     const safePulls = safeJson(pulls);
     const totalPages = Math.ceil(totalCount / limit);
 
-    // 5️⃣ Return paginated result
+    // Return paginated result
     return NextResponse.json({
       totalCount,
       totalPages,
@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
       source: "Database",
     });
   } catch (error) {
-    console.error("❌ [GET /pulls] Error:", error);
+    console.error("[GET /pulls] Error:", error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Internal Server Error" },
       { status: 500 }

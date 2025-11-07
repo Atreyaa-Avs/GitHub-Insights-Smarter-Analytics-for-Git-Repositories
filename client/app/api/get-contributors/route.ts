@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Invalid repoUrl format" }, { status: 400 });
 
   try {
-    // 1️⃣ Try fetching repo from DB
+    // Try fetching repo from DB
     const repo = await prisma.repo.findUnique({
       where: { owner_name: { owner, name } },
     });
@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // 2️⃣ Try fetching top contributors from DB
+    // Try fetching top contributors from DB
     const contributorsFromDb = await prisma.contributorRank.findMany({
       where: { repo_id: repo.id },
       include: { user: true },
@@ -64,12 +64,12 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // 3️⃣ Count total contributors
+    // Count total contributors
     const totalContributors = await prisma.contributorRank.count({
       where: { repo_id: repo.id },
     });
 
-    // 4️⃣ Return normalized contributors + total count
+    // Return normalized contributors + total count
     const topContributors = contributorsFromDb.map(normalizeContributor);
 
     return NextResponse.json({

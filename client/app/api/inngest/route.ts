@@ -14,21 +14,6 @@ import {
   syncWeeklyCommits,
 } from "@/inngest/functions";
 
-// export const { GET, POST, PUT } = serve({
-//   client: inngest,
-//   functions: [
-//     fetchRepoData,
-//     syncCommits,
-//     fetchContributors,
-//     syncIssues,
-//     syncLanguages,
-//     syncParticipation,
-//     syncPulls,
-//     syncReleases,
-//     syncWeeklyCommits,
-//   ],
-// });
-
 export const { GET, POST, PUT } = serve({
   client: inngest,
   functions: [

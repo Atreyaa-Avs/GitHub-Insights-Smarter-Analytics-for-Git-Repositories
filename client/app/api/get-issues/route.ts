@@ -40,12 +40,12 @@ export async function GET(request: NextRequest) {
   const [owner, name] = repoUrl.split("/");
 
   try {
-    // 1️⃣ Check repo in DB
+    // Check repo in DB
     const repo = await prisma.repo.findUnique({
       where: { owner_name: { owner, name } },
     });
 
-    // 2️⃣ If repo missing → trigger Inngest background sync
+    // If repo missing → trigger Inngest background sync
     if (!repo) {
       console.log(`GET: Repo ${owner}/${name} not found, triggering sync...`);
       await inngest.send({
@@ -58,14 +58,14 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // 3️⃣ Fetch open issues from DB
+    // Fetch open issues from DB
     const issuesRaw = await prisma.issue.findMany({
       where: { repo_id: repo.id, state: "open" },
       orderBy: { created_at: "desc" },
       take: 50,
     });
 
-    // 4️⃣ If no issues → trigger Inngest background sync
+    // If no issues → trigger Inngest background sync
     if (!issuesRaw.length) {
       console.log(
         `GET: No open issues in DB for ${owner}/${name}, triggering sync...`

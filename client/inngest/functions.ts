@@ -16,9 +16,9 @@ async function ensureRepoWithId(owner: string, name: string) {
   });
 
   if (!repo?.id)
-    throw new Error(`❌ Repo ID still missing for ${owner}/${name}`);
+    throw new Error(`Repo ID still missing for ${owner}/${name}`);
 
-  // 🧩 Normalize BigInt or object into usable numeric form
+  // Normalize BigInt or object into usable numeric form
   const rawId = repo.id as any;
   const normalizedId =
     typeof rawId === "bigint"
@@ -29,7 +29,7 @@ async function ensureRepoWithId(owner: string, name: string) {
 
   if (!normalizedId)
     throw new Error(
-      `❌ Repo ID invalid format for ${owner}/${name}: ${JSON.stringify(repo)}`
+      `Repo ID invalid format for ${owner}/${name}: ${JSON.stringify(repo)}`
     );
 
   return normalizedId;
@@ -234,7 +234,7 @@ async function fetchCommitsFromGitHub(
   return commits.length;
 }
 
-// 👇 Actual Inngest function
+//  Actual Inngest function
 export const syncCommits = inngest.createFunction(
   { id: "sync-commits" },
   { event: "repo/sync.commits" },
@@ -262,9 +262,9 @@ export const syncContributors = inngest.createFunction(
     const token = githubAccessToken || process.env.GITHUB_ACCESS_TOKEN;
     if (!token) throw new Error("GitHub token not provided");
 
-    console.log(`🔄 Syncing contributors for ${owner}/${name}...`);
+    console.log(` Syncing contributors for ${owner}/${name}...`);
 
-    // 1️⃣ Ensure repo exists and safely extract its ID as a number
+    //  Ensure repo exists and safely extract its ID as a number
     const repo = await step.run("Ensure repo", async () => {
       const ensured = await prisma.repo.upsert({
         where: { owner_name: { owner, name } },
@@ -273,16 +273,16 @@ export const syncContributors = inngest.createFunction(
         select: { id: true },
       });
 
-      if (!ensured?.id) throw new Error("❌ Repo ID missing after upsert");
+      if (!ensured?.id) throw new Error(" Repo ID missing after upsert");
 
-      // ✅ Convert BigInt → number for safe serialization inside Inngest
+      //  Convert BigInt → number for safe serialization inside Inngest
       return { id: Number(ensured.id) };
     });
 
     const repoId = repo.id;
-    if (!repoId) throw new Error("❌ Repo ID missing after upsert (post-cast)");
+    if (!repoId) throw new Error(" Repo ID missing after upsert (post-cast)");
 
-    // 2️⃣ Fetch contributors from GitHub
+    // Fetch contributors from GitHub
     const contributorsData = await step.run(
       "Fetch GitHub contributors",
       async () => {
@@ -305,7 +305,7 @@ export const syncContributors = inngest.createFunction(
       }
     );
 
-    // 3️⃣ Upsert contributors and ranks
+    // Upsert contributors and ranks
     await step.run("Upsert contributors", async () => {
       await Promise.all(
         contributorsData.map(async (c: any) => {
@@ -336,7 +336,7 @@ export const syncContributors = inngest.createFunction(
     });
 
     console.log(
-      `✅ Synced ${contributorsData.length} contributors for ${owner}/${name}`
+      ` Synced ${contributorsData.length} contributors for ${owner}/${name}`
     );
 
     return {
@@ -355,7 +355,7 @@ export const syncIssues = inngest.createFunction(
     const githubAccessToken = process.env.GITHUB_ACCESS_TOKEN;
     if (!githubAccessToken) throw new Error("GitHub token not configured");
 
-    // 1️⃣ Ensure repo exists and safely extract repoId
+    // Ensure repo exists and safely extract repoId
     const repo = await step.run("Ensure repo", async () => {
       const ensured = await prisma.repo.upsert({
         where: { owner_name: { owner, name } },
@@ -364,16 +364,16 @@ export const syncIssues = inngest.createFunction(
         select: { id: true },
       });
 
-      if (!ensured?.id) throw new Error("❌ Repo ID missing after upsert");
+      if (!ensured?.id) throw new Error(" Repo ID missing after upsert");
 
-      // ✅ Cast BigInt → Number for Inngest-safe serialization
+      //  Cast BigInt → Number for Inngest-safe serialization
       return { id: Number(ensured.id) };
     });
 
     const repoId = repo.id;
-    if (!repoId) throw new Error("❌ Repo ID missing after upsert (post-cast)");
+    if (!repoId) throw new Error(" Repo ID missing after upsert (post-cast)");
 
-    // 2️⃣ Fetch open issues from GitHub
+    // Fetch open issues from GitHub
     const issuesData = await step.run("Fetch GitHub issues", async () => {
       const res = await fetch(
         `https://api.github.com/search/issues?q=repo:${owner}/${name}+is:issue+is:open&sort=created&order=desc&per_page=50`,
@@ -390,14 +390,14 @@ export const syncIssues = inngest.createFunction(
       return data.items || [];
     });
 
-    // 3️⃣ Upsert each issue into DB
+    // Upsert each issue into DB
     await step.run("Upsert issues", async () => {
       await Promise.all(
         issuesData.map((i: any) =>
           prisma.issue.upsert({
             where: {
               repo_id_issue_number: {
-                repo_id: BigInt(repoId), // ✅ match schema
+                repo_id: BigInt(repoId), // match schema
                 issue_number: i.number,
               },
             },
@@ -422,7 +422,7 @@ export const syncIssues = inngest.createFunction(
       );
     });
 
-    console.log(`✅ Synced ${issuesData.length} issues for ${owner}/${name}`);
+    console.log(` Synced ${issuesData.length} issues for ${owner}/${name}`);
 
     return {
       totalFetched: issuesData.length,
@@ -440,7 +440,7 @@ export const syncLanguages = inngest.createFunction(
     const githubAccessToken = process.env.GITHUB_ACCESS_TOKEN;
     if (!githubAccessToken) throw new Error("GitHub token not configured");
 
-    // 1️⃣ Ensure repo exists
+    // Ensure repo exists
     const repo = await step.run("Ensure repo", async () =>
       prisma.repo.upsert({
         where: { owner_name: { owner, name } },
@@ -449,7 +449,7 @@ export const syncLanguages = inngest.createFunction(
       })
     );
 
-    // 2️⃣ Fetch languages from GitHub
+    // Fetch languages from GitHub
     const languagesData = await step.run("Fetch GitHub languages", async () => {
       const res = await fetch(
         `https://api.github.com/repos/${owner}/${name}/languages`,
@@ -466,7 +466,7 @@ export const syncLanguages = inngest.createFunction(
       return data; // e.g., { "TypeScript": 1200, "JavaScript": 800 }
     });
 
-    // 3️⃣ Upsert languages into DB
+    // Upsert languages into DB
     await step.run("Upsert languages", async () => {
       const ops = Object.entries(languagesData).map(([language, bytes]) =>
         prisma.repoLanguage.upsert({
@@ -490,7 +490,7 @@ export const syncParticipation = inngest.createFunction(
     const githubAccessToken = process.env.GITHUB_ACCESS_TOKEN;
     if (!githubAccessToken) throw new Error("GitHub token not configured");
 
-    // 1️⃣ Ensure repo exists
+    //  Ensure repo exists
     const repo = await step.run("Ensure repo", async () =>
       prisma.repo.upsert({
         where: { owner_name: { owner, name } },
@@ -499,7 +499,7 @@ export const syncParticipation = inngest.createFunction(
       })
     );
 
-    // 2️⃣ Fetch participation stats from GitHub
+    // Fetch participation stats from GitHub
     const data = await step.run("Fetch GitHub participation", async () => {
       const res = await fetch(
         `https://api.github.com/repos/${owner}/${name}/stats/participation`,
@@ -534,7 +534,7 @@ export const syncParticipation = inngest.createFunction(
     const now = new Date();
     const startYear = new Date(now.getFullYear(), 0, 1); // Jan 1st of current year
 
-    // 3️⃣ Upsert weekly participation stats
+    // Upsert weekly participation stats
     await step.run("Upsert participation stats", async () => {
       const ops = allCommits.map((commits, i) => {
         const weekStart = new Date(startYear);
@@ -569,7 +569,7 @@ export const syncPulls = inngest.createFunction(
     const githubAccessToken = process.env.GITHUB_ACCESS_TOKEN;
     if (!githubAccessToken) throw new Error("GitHub token not configured");
 
-    // 1️⃣ Ensure repo exists — return ID as string for safe serialization
+    //  Ensure repo exists — return ID as string for safe serialization
     const repoIdStr = await step.run("Ensure Repo (string id)", async () => {
       const repo = await prisma.repo.upsert({
         where: { owner_name: { owner, name } },
@@ -589,9 +589,9 @@ export const syncPulls = inngest.createFunction(
     }
 
     const repoId = BigInt(repoIdStr);
-    console.log(`✅ Ensured Repo ID: ${repoId} for ${owner}/${name}`);
+    console.log(` Ensured Repo ID: ${repoId} for ${owner}/${name}`);
 
-    // 2️⃣ Fetch PRs from GitHub
+    //  Fetch PRs from GitHub
     const prsData = await step.run("Fetch GitHub PRs", async () => {
       const res = await fetch(
         `https://api.github.com/repos/${owner}/${name}/pulls?state=all&per_page=50`,
@@ -619,7 +619,7 @@ export const syncPulls = inngest.createFunction(
       );
     }
 
-    // 3️⃣ Upsert PRs into DB — all dates are correctly typed
+    // Upsert PRs into DB — all dates are correctly typed
     await step.run("Upsert PRs", async () => {
       for (const pr of prsData) {
         const prNumber =
@@ -657,7 +657,7 @@ export const syncPulls = inngest.createFunction(
     });
 
     console.log(
-      `✅ Synced ${prsData.length} PRs for ${owner}/${name} (Repo ID: ${repoId})`
+      ` Synced ${prsData.length} PRs for ${owner}/${name} (Repo ID: ${repoId})`
     );
 
     return {
@@ -685,7 +685,7 @@ export const syncReleases = inngest.createFunction(
     if (!githubAccessToken) throw new Error("GitHub token not configured");
 
     // ---------------------------------------------------------------
-    // 1️⃣ Ensure repo exists and safely return ID
+    // Ensure repo exists and safely return ID
     // ---------------------------------------------------------------
     const repo = await step.run("Ensure repo", async () => {
       // Try to find repo first
@@ -696,7 +696,7 @@ export const syncReleases = inngest.createFunction(
 
       if (found?.id) {
         console.log(
-          `🔁 Found existing repo: ${owner}/${name} (ID: ${found.id})`
+          `Found existing repo: ${owner}/${name} (ID: ${found.id})`
         );
         return safeJson(found); // convert BigInt to string
       }
@@ -707,21 +707,21 @@ export const syncReleases = inngest.createFunction(
         select: { id: true },
       });
 
-      console.log(`🆕 Created new repo: ${owner}/${name} (ID: ${created.id})`);
+      console.log(`Created new repo: ${owner}/${name} (ID: ${created.id})`);
       return safeJson(created);
     });
 
     if (!repo?.id) {
-      console.error("❌ Repo ID missing — upsert failed. Repo object:", repo);
+      console.error(" Repo ID missing — upsert failed. Repo object:", repo);
       throw new Error("Repo ID missing — upsert failed");
     }
 
     // Normalize repoId safely
     const repoId = BigInt(repo.id);
-    console.log(`✅ Ensured Repo ID: ${repoId} for ${owner}/${name}`);
+    console.log(`Ensured Repo ID: ${repoId} for ${owner}/${name}`);
 
     // ---------------------------------------------------------------
-    // 2️⃣ Fetch releases from GitHub
+    // Fetch releases from GitHub
     // ---------------------------------------------------------------
     const releasesData = await step.run("Fetch GitHub releases", async () => {
       const res = await fetch(
@@ -750,7 +750,7 @@ export const syncReleases = inngest.createFunction(
     }
 
     // ---------------------------------------------------------------
-    // 3️⃣ Upsert releases into DB
+    //  Upsert releases into DB
     // ---------------------------------------------------------------
     await step.run("Upsert releases", async () => {
       const ops = releasesData.map((r: any) => {
@@ -775,20 +775,20 @@ export const syncReleases = inngest.createFunction(
             html_url: r.html_url ?? "",
             created_at: createdAt,
             published_at: publishedAt,
-            repo_id: repoId, // ✅ safe BigInt
+            repo_id: repoId, //  safe BigInt
           },
         });
       });
 
       await Promise.all(ops);
-      console.log(`💾 Upserted ${ops.length} releases for ${owner}/${name}`);
+      console.log(` Upserted ${ops.length} releases for ${owner}/${name}`);
     });
 
     // ---------------------------------------------------------------
-    // 4️⃣ Final summary
+    // Final summary
     // ---------------------------------------------------------------
     console.log(
-      `✅ Synced ${releasesData.length} releases for ${owner}/${name} (Repo ID: ${repoId})`
+      `Synced ${releasesData.length} releases for ${owner}/${name} (Repo ID: ${repoId})`
     );
 
     return {
@@ -807,7 +807,7 @@ export const syncWeeklyCommits = inngest.createFunction(
     const githubAccessToken = process.env.GITHUB_ACCESS_TOKEN;
     if (!githubAccessToken) throw new Error("GitHub token not configured");
 
-    // 1️⃣ Ensure repo exists in DB
+    // Ensure repo exists in DB
     // Ensure repo exists and get id
     const repo = await prisma.repo.upsert({
       where: { owner_name: { owner, name } },
@@ -816,7 +816,7 @@ export const syncWeeklyCommits = inngest.createFunction(
       select: { id: true }, // <-- ensures repo.id is defined
     });
 
-    // 2️⃣ Fetch weekly commits from GitHub
+    // Fetch weekly commits from GitHub
     const commitsData: { week: number; total: number }[] = await step.run(
       "Fetch GitHub weekly commits",
       async () => {
@@ -838,7 +838,7 @@ export const syncWeeklyCommits = inngest.createFunction(
       }
     );
 
-    // 3️⃣ Upsert weekly commits into DB
+    // Upsert weekly commits into DB
     await step.run("Upsert weekly commits", async () => {
       const ops = commitsData.map((week) =>
         prisma.weeklyCommit.upsert({
@@ -859,7 +859,7 @@ export const syncWeeklyCommits = inngest.createFunction(
       await Promise.all(ops);
     });
 
-    // 4️⃣ Return safe result for frontend
+    //  Return safe result for frontend
     return {
       totalWeeks: commitsData.length,
       repoId: repo.id,
